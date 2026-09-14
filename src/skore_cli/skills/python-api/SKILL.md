@@ -407,7 +407,9 @@ calls for inspection.** Inspection goes in `scratch/`.
 
 **Never re-run an experiment / `project.put` from a scratch probe.**
 Scratch is read-only against the skore Project (use
-`project.summarize()` then `project.get(id)`).
+`project.summarize()` then `project.get(id)`). **Exception:**
+`explore-ml-data`'s `scratch/eda/share.py` may `put` reserved key
+`eda` only.
 
 **Read-only rule extends to `audit/`.** The audit flow places one
 `# %%` file per experiment under `audit/<NN>_<short_name>.py` and

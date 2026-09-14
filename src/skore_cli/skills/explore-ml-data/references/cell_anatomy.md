@@ -205,7 +205,9 @@ a fast, representative read, not exhaustive stats.
 ## What NOT to do in these cells
 
 - No imputation / dropping / re-saving of raw files (read-only).
-- No `skore.evaluate` / `project.put` (that is the experiment's job).
+- No `skore.evaluate` / `project.put` **in these cells** (Hub share
+  is `scratch/eda/share.py` after the files exist; see
+  `references/hub_share.md`).
 - No splitter / metric / learner *decision* - only the *evidence*.
 - No pandas/polars-specific summary methods - read skrub's json.
 - No `warnings.filterwarnings(...)`: stderr in the digest is signal

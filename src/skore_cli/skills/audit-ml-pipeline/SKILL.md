@@ -33,7 +33,8 @@ description: >
   report to source the *next* experiment (`iterate-from-skore`); the
   user wants to explore the **raw dataset** rather than a finished
   run's skore report (`explore-ml-data`: audit reads a report, not
-  the data).
+  the data); the report key is `eda` (workspace EDA share, not an
+  experiment stem).
 
   HOW TO USE: confirm the four-way stem pairing exists (`journal/NN_*.md`
   approved + `experiments/NN_*.py` exists + smoke test passed +

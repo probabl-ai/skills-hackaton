@@ -88,11 +88,13 @@ Sibling skills (just-in-time):
 - **Scratch is read-only against the skore Project.** Probes under
   `scratch/<ts>_<short>.py` may call `project.get(...)`,
   `project.summarize()`, walk an existing report. They MUST NOT
-  call `skore.evaluate(...)` or `project.put(...)`. When
+  call `skore.evaluate(...)` or `project.put(...)`. **Exception:**
+  `explore-ml-data`'s `scratch/eda/share.py` may `evaluate` / `put`
+  **only** the EDA carrier under reserved key `eda`. When
   `project.get(key)` raises `KeyError`, the fix is the lookup
   shape: `get` is by **id**, not by `key`. Use `summarize()` →
   `(key, id)` → `get(id)`. Never substitute by re-running
-  `evaluate` + `put`.
+  `evaluate` + `put` for experiment keys.
 - **Tabular library is asked, not assumed (G-TABULAR).** Pandas
   being importable via skore is not a pick. Invoke
   `data-science-python-stack` for the structured ask. Free-text
@@ -364,6 +366,9 @@ Each has a narrow contract:
   the cross-validator (`splitter = ...`), optional metric
   overrides. Does NOT call `skore.evaluate`, does NOT open a
   Project, does NOT persist.
+- **`eda_carrier.py`**: sklearn estimator that stores EDA file
+  texts as parameters so Hub `put("eda", report)` can restore
+  `data/eda.py` / `eda.md` / HTML. Do not put model logic here.
 
 ## Experiment scripts: `experiments/NN_*.py`
 
@@ -392,14 +397,15 @@ expression - that's a notebook-display side effect.
 
 **Experiment key convention**: the file's stem (e.g.
 `01_baseline.py` → `"01_baseline"`). One file → one key → one
-report.
+report. **Reserved:** `"eda"` is the workspace EDA share
+(`explore-ml-data`). Never `put` a model under that key.
 
 ## Companion skills
 
 | Skill | Relationship |
 |---|---|
 | `iterate-ml-experiment` | Owns `journal/JOURNAL.md` and per-experiment design notes. This skill places empty `journal/`; that skill fills it |
-| `explore-ml-data` | Owns the EDA deliverables inside the user's `data/` (`data/eda.py`, `data/eda.md`, `data/eda_<table>.html`) - the one exception to "this skill doesn't touch `data/`". Reads raw data, never rewrites it |
+| `explore-ml-data` | Owns the EDA deliverables inside the user's `data/` (`data/eda.py`, `data/eda.md`, `data/eda_<table>.html`) and Hub share under key `eda`. Reads raw data, never rewrites it. Copies `eda_carrier.py` if scaffold missed it |
 | `build-ml-pipeline` | Body of `pipeline.py`, `features.py`, `data.py` |
 | `evaluate-ml-pipeline` | Body of `evaluate.py`; CV strategy |
 | `test-ml-pipeline` | Layout of `tests/<category>/` + stem-pairing rule |
@@ -420,6 +426,7 @@ report.
   immediately before `login(mode="hub")`.
 - `templates/src_data.py` / `src_features.py` / `src_pipeline.py` /
   `src_evaluate.py`: one-time skeletons
+- `templates/src_eda_carrier.py`: EDA Hub carrier (`eda_carrier.py`)
 - `templates/.gitignore`: dropped at scaffold if none exists
 
 **Copy, don't rewrite.** Section names encode contracts.

@@ -57,7 +57,9 @@ Use `templates/src___init__.py` for `__init__.py` (carries
 `PROJECT_ROOT`). Use `templates/src_hub.py` for hub credentials
 (`load_skore_credentials`; call it before `login(mode="hub")`). Use `templates/src_data.py`,
 `templates/src_features.py`, `templates/src_pipeline.py`,
-`templates/src_evaluate.py` for the four modules.
+`templates/src_evaluate.py` for the four modules. Use
+`templates/src_eda_carrier.py` for `eda_carrier.py` (EDA files
+shared on Hub under reserved key `eda`).
 
 Each is a skeleton; the actual content lands later when
 `build-ml-pipeline` / `evaluate-ml-pipeline` are invoked.

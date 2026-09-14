@@ -12,18 +12,20 @@ description: >
   that JUSTIFY the later learner / splitter / metric decisions, so the
   user understands *why* the modelling choices are made. Uses
   `skrub.TableReport` for dataframe overviews and the shared runner
-  `audit-ml-pipeline/scripts/run_cells.py`. Stops at "EDA executed,
-  `data/eda.md` + HTML written, JOURNAL EDA section updated." Never
-  designs the model, never edits `src/<pkg>/`, never modifies the
-  user's raw data files.
+  `audit-ml-pipeline/scripts/run_cells.py`. Stops at "EDA executed
+  or fetched, `data/eda.md` + HTML written, JOURNAL EDA section
+  updated" (hub: also `put`/`get` key `eda`; wait = stop, no
+  baseline). Never designs the model, never edits experiment files,
+  never modifies the user's raw data files.
 
   TRIGGER - any of:
   - `iterate-ml-experiment` § 0 bootstrap, BEFORE the baseline design
-    note - the G-EDA gate fires here (run / skip).
+    note - the G-EDA gate fires here (run / skip / hub fetch / wait).
   - The user asks to "explore the data", "do an EDA", "profile the
     dataset", "what does the data look like", "understand the data".
   - A new or changed data source needs (re-)understanding before the
     next experiment.
+  - Hub mode: lookup / fetch / wait for a teammate's EDA on key `eda`.
 
   SKIP when: the workspace isn't scaffolded / bootstrapped yet -
   `iterate-ml-experiment` § 0 owns bootstrap ordering and will
@@ -34,16 +36,20 @@ description: >
   (`audit-ml-pipeline`); the user is past data understanding and wants
   pipeline / evaluation mechanics (`build-ml-pipeline` /
   `evaluate-ml-pipeline`); a pure symbol lookup (`python-api`); EDA is
-  already recorded (`data/eda.md` + the JOURNAL EDA section exist) and
-  the user is not asking to refresh it.
+  already recorded locally (`data/eda.md` + JOURNAL Status done /
+  done (fetched)) and the user is not asking to refresh it. Hub
+  mode: do NOT skip before a Hub lookup — a teammate's `eda` report
+  may already be there, or JOURNAL Status may be `waiting`.
 
-  HOW TO USE: run the Detection step (does `data/eda.md` + the JOURNAL
-  EDA section already exist?), emit the Pre-flight checklist as
-  visible text, read the Stop conditions, then place `data/eda.py`
-  from `templates/eda.py`, execute it via the shared runner, read the
-  digest, and author `data/eda.md` + the JOURNAL EDA section. Always
-  resolve skrub / pandas / polars symbols via `python-api`, never from
-  memory.
+  HOW TO USE: emit the Pre-flight checklist as visible text and read
+  the Stop conditions. Hub mode: lookup key `eda` FIRST
+  (`references/hub_share.md`) — fetch if present, else ask run vs
+  wait (never skip; never draft the baseline while waiting). Local /
+  mlflow: Detection (local files?) then run / skip. On run, place
+  `data/eda.py` from `templates/eda.py`, execute it via the shared
+  runner, author `data/eda.md` + the JOURNAL EDA section, then (hub)
+  `put` under key `eda`. Always resolve skrub / pandas / polars /
+  skore symbols via `python-api`, never from memory.
 ---
 
 # Explore ML Data
@@ -52,7 +58,10 @@ Understand the dataset before designing a model. One project-level
 EDA per workspace: an executable `data/eda.py`, a persisted
 `data/eda.md` narrative, rich `data/eda_<table>.html` reports, and a
 short JOURNAL section that links them. The findings feed the baseline
-design note's learner / splitter / metric choices.
+design note's learner / splitter / metric choices. In **hub** mode
+the same artifacts are shared under the reserved Project key `eda`
+so one teammate can compute and the others fetch — procedure in
+`references/hub_share.md`.
 
 ## Next-step pointers: where you go after this skill
 
@@ -77,11 +86,16 @@ default. Running EDA after the model is designed defeats the purpose.
 ```
 scaffold → JOURNAL → goal from data/README.md
    │
-   └─► G-EDA (run | skip)  ◄── this skill
-         │ run
-         └─► data/eda.py → execute → data/eda.md + HTML + JOURNAL §EDA
+   └─► G-EDA  ◄── this skill
+         │ hub: lookup key `eda` FIRST (references/hub_share.md)
+         │   present  → fetch if local missing → JOURNAL done (fetched)
+         │   missing  → ask run | wait  (never skip; wait = STOP)
+         │ local/mlflow: ask run | skip
+         │ run → data/eda.py → execute → data/eda.md + HTML
+         │        → (hub) put key `eda` → JOURNAL §EDA
    │
    └─► auto-draft 01_baseline.md  (cites the EDA findings)
+         │ blocked while JOURNAL Status is waiting
 ```
 
 ## Where things live: visual map
@@ -97,7 +111,9 @@ may live anywhere) and the **EDA deliverables** (always under
 | `data/eda.md` | **Durable** (committed) | This skill (authored from the digest) | The prose narrative: findings + **modelling implications** that the baseline note cites |
 | `data/eda_<table>.html` | **Durable** (committed) | `data/eda.py` via `TableReport.write_html(...)` | The rich, interactive skrub report per table - for the human |
 | `scratch/eda/eda.md` | Ephemeral (gitignored), optional | `run_cells.py` when given a 2nd arg | Per-cell digest the agent reads. Same content as stdout |
-| `journal/JOURNAL.md` § Data understanding (EDA) | **Durable** (committed) | This skill | 2–4 line summary + link to `data/eda.md` |
+| `journal/JOURNAL.md` § Data understanding (EDA) | **Durable** (committed) | This skill | 2–4 line summary + link to `data/eda.md`; hub: Status + Hub URL |
+| `src/<pkg>/eda_carrier.py` | **Durable** (committed) | This skill if missing; else `organize-ml-workspace` at scaffold | Sklearn estimator that carries EDA files through the Hub report |
+| `scratch/eda/share.py` | Ephemeral (gitignored) | This skill | Lookup / fetch / put for key `eda` (only scratch script allowed to `put`) |
 
 **Mnemonic:** the raw data is *read-only and lives wherever the user
 keeps it*; `data/eda.py` is *source*; `data/eda.md` + the HTML are the
@@ -108,14 +124,15 @@ stdout are the *ephemeral run digest*.
 
 The central rule. Surfaced as the first Stop condition below.
 
-**Allowed - this skill writes ONLY (deliverables always under
-`<project>/data/`, created if absent):**
+**Allowed writes** (raw data stays read-only):
 
 - `data/eda.py`: the EDA script (created / overwritten in place).
 - `data/eda.md`: the authored narrative.
 - `data/eda_<table>.html`: the skrub `TableReport` pages.
-- `scratch/eda/`: the ephemeral digest.
+- `scratch/eda/`: the ephemeral digest **and** `scratch/eda/share.py`.
 - `journal/JOURNAL.md` § Data understanding (EDA).
+- `src/<pkg>/eda_carrier.py`: copy from `templates/eda_carrier.py` if
+  missing (needed before Hub `put` / `get`).
 
 **Forbidden:**
 
@@ -126,9 +143,12 @@ The central rule. Surfaced as the first Stop condition below.
   (`build-ml-pipeline`), declared at fit time, not a one-off mutation.
 - Writing anywhere outside the five paths above - no `src/<pkg>/`
   edits, no `reports/` writes, no new experiment files.
-- Designing the model: no `skore.evaluate(...)`, no `project.put(...)`,
-  no learner selection here. EDA *informs* those; it does not make
-  them.
+- Designing the model: no learner selection, no experiment keys
+  (`01_*`). EDA *informs* those; it does not make them.
+- **Exception (hub only):** after local EDA files exist, `evaluate` +
+  `project.put("eda", …)` of the **EDACarrier** report, from
+  `scratch/eda/share.py` only. Procedure: `references/hub_share.md`.
+  That is not model design.
 
 ## Stop conditions: read before anything else
 
@@ -143,18 +163,24 @@ The central rule. Surfaced as the first Stop condition below.
   decouple the two: a `RAW = <LOAD_RAW_DATA>` source vs an `EDA_DIR`
   output. Never assume the raw data is in `data/`.
 - **EDA precedes model design (G-EDA).** In bootstrap, the gate fires
-  **before** `journal/01_baseline.md` is drafted. It is binary:
-  **run** (place + execute `data/eda.py`, write the deliverables) or
-  **skip** (record `Status: skipped - <date>` in the JOURNAL section
-  and proceed). Do not silently bypass - fire the `AskUserQuestion`.
-  Free-text "go fast" / "quick baseline" does NOT resolve it.
-- **Agent feature required to execute.** The cell runner needs
-  `ipython`. If it is missing and the user chose **run**, STOP and
-  delegate to `python-env-manager` § "Agent feature"
-  (`G-AGENT-FEATURE`). Do NOT type `pixi add ... ipython` yourself;
-  do NOT fabricate EDA output with hand-written `print()`s. If the
-  user declines the agent feature, **fall back to the skip path**
-  (record `Status: skipped`) - never loop between run and install.
+  **before** `journal/01_baseline.md` is drafted. **Hub mode: lookup
+  key `eda` first, every time** — even if local files are missing,
+  even if JOURNAL Status is `waiting`. Full flow:
+  `references/hub_share.md`. If Hub has no `eda`, tell the user and
+  ask **run** vs **wait** (teammate already computing). **wait**
+  writes `Status: waiting` and **STOP**s — do not skip, do not draft
+  the baseline, do not busy-loop; resume by looking up Hub again.
+  Local / mlflow stay **run** / **skip**. Free-text "go fast" /
+  "quick baseline" does NOT resolve the ask.
+- **Agent feature required to execute the run path.** The cell
+  runner needs `ipython`. If it is missing and the user chose
+  **run**, STOP and delegate to `python-env-manager` § "Agent
+  feature" (`G-AGENT-FEATURE`). Do NOT type `pixi add ... ipython`
+  yourself; do NOT fabricate EDA output with hand-written `print()`s.
+  Hub: if they decline the install, stay blocked (JOURNAL can stay
+  unset or `waiting`) — do **not** skip so modelling can start.
+  Local / mlflow: decline → skip path. Fetch / wait do not need
+  `ipython`.
 - **Symbol from memory is forbidden.** Any `skrub` / `pandas` /
   `polars` symbol (`TableReport`, `TableReport.json`, `write_html`,
   `column_associations`, the tabular reader, …) must come from
@@ -210,6 +236,10 @@ The central rule. Surfaced as the first Stop condition below.
 | Shortcut | Why it's wrong |
 |---|---|
 | Design the baseline first, EDA "later if there's time" | Inverts G-EDA. The point is to justify the modelling choices *before* making them. EDA runs first in bootstrap |
+| Hub mode: skip the Hub lookup and run EDA (or skip) | Always lookup key `eda` first. A teammate may already have uploaded, or be about to |
+| Treat **wait** as **skip** and draft `01_baseline` | Wait means modelling is blocked until Hub has `eda` or the user chooses **run** |
+| Busy-loop `sleep` + lookup while waiting | Stop the turn. Resume on the next user message by looking up Hub again |
+| `put` the EDA carrier under `01_*` or from `data/eda.py` | Reserved key is `eda`. Sharing is `scratch/eda/share.py` only |
 | End a cell on a bare `TableReport(df)` to "show the report" | Outside a notebook that repr is `<TableReport: use .open() to display>`: zero signal in the digest. Use `write_html(...)` + a text summary built from `report.json()` |
 | `print(...)` instead of a bare summary expression | The runner captures bare last-expressions via `result.result`; `print(...)` lands in stdout and is harder to scan. Use bare expressions |
 | Use pandas/polars methods (`df.isna()`, `df.nunique()`, `df.select_dtypes(...)`) for the summaries | Breaks on the other library (polars has no `select_dtypes`). Read the facts off `skrub` (`TableReport(...).json()`, `column_associations`) - agnostic to pandas/polars |
@@ -228,13 +258,20 @@ The central rule. Surfaced as the first Stop condition below.
 Pre-flight (explore-ml-data):
 - [ ] Trigger: bootstrap-G-EDA | user-request | data-changed
       Evidence: caller + rule that matched
-- [ ] Detection: EDA already present? data/eda.md + JOURNAL §EDA
+- [ ] Detection: EDA already present locally? data/eda.md + JOURNAL §EDA
       Evidence: ls / Glob on data/eda.md + Read JOURNAL §EDA
                 | "n/a - first EDA"
-- [ ] G-EDA resolved: run | skip
-      Evidence: AskUserQuestion id=<id>, answer=<run|skip>
+- [ ] (Hub mode) Hub lookup for key `eda` ran BEFORE run / wait / skip
+      Evidence: scratch/eda/share.py MODE=lookup output this turn
+                | "n/a - local / mlflow mode"
+- [ ] G-EDA resolved: fetched | run | wait | skip
+      Evidence: Hub row present → fetch
+                | AskUserQuestion id=<id>, answer=<run|wait> (hub, key missing)
+                | AskUserQuestion id=<id>, answer=<run|skip> (local / mlflow)
                 | user free-text quote turn N
+      If wait: JOURNAL Status: waiting; STOP (no baseline).
       If skip: JOURNAL §EDA records "Status: skipped - <date>"; STOP here.
+      If fetched: files restored; JOURNAL Status: done (fetched); STOP here.
 - [ ] Tabular library known (G-TABULAR): pandas | polars
       Evidence: JOURNAL.md Status (Workspace decisions) | AskUserQuestion
                 via data-science-python-stack
@@ -252,7 +289,8 @@ Pre-flight (explore-ml-data):
                 (decline → fall back to skip path)
 - [ ] python-api consulted for symbols used:
         skrub.TableReport, TableReport.write_html, TableReport.json,
-        skrub.column_associations, the tabular reader (load cell only)
+        skrub.column_associations, the tabular reader (load cell only);
+        (hub) Project, login, evaluate, summarize, get
       Evidence: Read/Write scratch/api/<lib>/<version>/<topic>.md (this turn)
                 | "n/a - cache hit + Read this turn"
 - [ ] Template copy + substitution decided:
@@ -268,7 +306,11 @@ Pre-flight (explore-ml-data):
       Evidence: command emitted before running
 - [ ] Deliverables written: data/eda.md (prose + implications),
         data/eda_<table>.html (≥1), JOURNAL §Data understanding
-      Evidence: Write of each | "n/a - skip path"
+      Evidence: Write of each | "n/a - skip / wait / fetch path"
+- [ ] (Hub mode, run path) key `eda` put after files exist
+      Evidence: scratch/eda/share.py MODE=put output / Hub URL
+                | "n/a - put failed (warn; local EDA still done)"
+                | "n/a - not hub run path"
 - [ ] Pre-flight re-emitted with evidence before final message.
       Evidence: this checklist appears in the end-of-turn summary.
 ```
@@ -391,15 +433,17 @@ Status`). This skill owns its content:
 ```
 ## Data understanding (EDA)
 
-- **Status:** done - <YYYY-MM-DD>   <!-- or: skipped - <YYYY-MM-DD> -->
+- **Status:** done - <YYYY-MM-DD>   <!-- or: done (fetched) | waiting | skipped -->
 - **Summary:** <2–4 lines: dataset shape, target balance/skew, the
   one or two findings that most shape the modelling choices>
 - **Report:** [data/eda.md](../data/eda.md)
+- **Hub:** <URL or report id | n/a>
 ```
 
 Keep it to a few lines - it is an index entry, not the report. The
-detail lives in `data/eda.md`. On the **skip** path, only the
-`Status: skipped` line is required.
+detail lives in `data/eda.md`. On **skip** (local / mlflow only),
+only the `Status: skipped` line is required. On **wait** (hub), only
+`Status: waiting` is required — no baseline until fetch or run.
 
 ## Dispatching in and out
 
@@ -415,20 +459,23 @@ detail lives in `data/eda.md`. On the **skip** path, only the
 | Callee | Why |
 |---|---|
 | `python-env-manager` § Agent feature | When `ipython` is missing on the run path - G-AGENT-FEATURE |
-| `python-api` | Every skrub / pandas / polars symbol. Cache hits first |
+| `python-api` | Every skrub / pandas / polars symbol. Cache hits first. Hub: skore Project / evaluate / get |
 | `data-science-python-stack` | G-TABULAR (pandas / polars) if not yet recorded; skrub `TableReport` reference |
 | `python-code-style` | After writing `data/eda.py`: ruff format / check + contextualize the comments to this dataset (strip any leftover workflow/process prose) |
+| `organize-ml-workspace` | Scaffolds `src/<pkg>/eda_carrier.py`; this skill copies the template if that file is missing |
 
 ## What this skill does NOT do
 
 - Design, select, or evaluate a model (`build-ml-pipeline` /
-  `evaluate-ml-pipeline` / `iterate-ml-experiment`).
+  `evaluate-ml-pipeline` / `iterate-ml-experiment`). The EDA
+  carrier `put` is not a model evaluation.
 - Pick the CV splitter or metric - it only surfaces the *evidence*
   for those picks.
-- Edit `src/<pkg>/` or the experiment / audit files.
+- Edit `src/<pkg>/` except copying `eda_carrier.py` when missing.
+- Edit experiment / audit files.
 - Clean, transform, or re-save the user's raw data.
 - Install `ipython` / `pyright` (`python-env-manager` owns).
-- Open or write the skore Project.
+- `put` under any key other than `eda`.
 - Render commits or PRs.
 
 ## Companion skills
@@ -448,6 +495,10 @@ detail lives in `data/eda.md`. On the **skip** path, only the
 - `templates/eda.py`: the `data/eda.py` skeleton. Copy + substitute;
   don't rewrite from memory.
 - `templates/eda.md`: the `data/eda.md` report skeleton.
+- `templates/eda_carrier.py`: copy to `src/<pkg>/eda_carrier.py` if
+  missing (also scaffolded by `organize-ml-workspace`).
+- `templates/share_eda.py`: copy to `scratch/eda/share.py` for Hub
+  lookup / fetch / put.
 
 The cell runner is **not** owned here - it is
 `audit-ml-pipeline/scripts/run_cells.py` (shared). Don't fork it.
@@ -457,3 +508,5 @@ The cell runner is **not** owned here - it is
 - `references/cell_anatomy.md`: concrete cell examples (right /
   wrong shapes), the `TableReport` repr trap, the full cell
   sequence, and how each finding maps to a downstream gate.
+- `references/hub_share.md`: Hub lookup / fetch / put / wait for
+  key `eda`. Load whenever `skore mode:` is hub.
