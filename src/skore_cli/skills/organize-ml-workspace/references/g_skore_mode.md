@@ -116,7 +116,10 @@ NOT remove `mlflow` or `local` from the list.
    a browser. If `.skore` is missing, tell the user to run
    `python scripts/install_skore.py` (see lab `GUIDED.md`
    and `references/hub_credentials.md`). The frontend hub is
-   https://ibm.skore.probabl.ai.
+   https://ibm.skore.probabl.ai. This lab: **one workspace per
+   Kaggle team**, name = Kaggle team name, created by one teammate
+   who invites the rest. Do not ask the user to type a workspace
+   name — it is already in `.skore`.
 
    **Validation**: the workspace name MUST NOT contain `/`. The
    `workspace=` value is a single Hub workspace identifier passed as

@@ -37,15 +37,16 @@ this block on later sessions avoids re-deciding what's already settled.
 ## Data understanding (EDA)
 
 <!--
-Short index entry - the full analysis lives in data/eda.md. If the
-data exploration was skipped, keep just the Status: skipped line.
+Short index entry - the full analysis lives in data/eda.md. If the data exploration was skipped (local / mlflow) or is waiting
+for a teammate upload (hub), keep just the Status line.
 -->
 
-- **Status:** <done | skipped> - <YYYY-MM-DD>
+- **Status:** <done | done (fetched) | waiting | skipped> - <YYYY-MM-DD>
 - **Summary:** <2–4 lines - dataset shape, target balance/skew, and the
   one or two findings that most shape the modelling choices. "n/a"
   until the data has been explored.>
 - **Report:** [data/eda.md](../data/eda.md)
+- **Hub:** <URL or report id | n/a>
 
 ## History
 

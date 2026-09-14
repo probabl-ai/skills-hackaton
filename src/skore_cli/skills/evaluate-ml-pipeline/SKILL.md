@@ -99,13 +99,15 @@ read the report. The pipeline declaration is out of scope (see
   around `skore.evaluate(...)` or the CV splitter unless the user
   explicitly asks. See `python-code-style` § Stop conditions.
 - **`skore.evaluate(...)` and `project.put(...)` live only in
-  `experiments/NN_*.py`.** The experiment script is the sole
-  producer of a report in the workspace's skore Project.
-  Re-running `evaluate` from a `scratch/` probe, an `audit/` file,
-  a notebook, or a one-off Python file in `src/` duplicates the
-  report under the same `key` and pollutes `project.summarize()`
-  - the cross-experiment metrics view the audit digest draws
-  from. **Two read-only consumers** of the Project share
+  `experiments/NN_*.py`**, except the EDA carrier. The experiment
+  script is the sole producer of **model** reports. Re-running
+  `evaluate` from a `scratch/` probe, an `audit/` file, a notebook,
+  or a one-off Python file in `src/` duplicates the report under
+  the same `key` and pollutes `project.summarize()`. **Exception:**
+  `explore-ml-data` may `evaluate` + `put` from `scratch/eda/share.py`
+  **only** under reserved key `eda` (EDA files, not a model). Never
+  `put` a learner under `eda`. Never `put` an experiment report from
+  scratch. **Two read-only consumers** of the Project share
   the same `summarize()` → `get(id)` → `report.*` discipline:
   `scratch/<ts>_*.py` probes (owned by `organize-ml-workspace`
   § "Scratch is read-only") and `audit/<stem>.py` files (owned by
@@ -153,12 +155,14 @@ Pre-flight (evaluate-ml-pipeline):
                 | "n/a - no new skore symbol introduced this turn"
       "Read python-api SKILL.md" alone is NOT evidence.
 - [ ] Call site for `skore.evaluate(...)` / `project.put(...)`
-      is `experiments/NN_*.py` (not `scratch/`, not a notebook,
+      is `experiments/NN_*.py` (not `scratch/` except
+      `scratch/eda/share.py` key `eda`, not a notebook,
       not `src/<pkg>/`). See Stop condition
       "`skore.evaluate(...)` and `project.put(...)` live only in
       `experiments/NN_*.py`".
       Evidence: Write experiments/<NN>_<name>.py (this turn) |
                 "the call already lives in an existing experiments/ file"
+                | "n/a - EDA carrier put owned by explore-ml-data"
 - [ ] Skill(python-api) consulted for sklearn splitter: <name>
       Evidence: Read scratch/api/sklearn/<version>/cv_splitters.md
                 (or topic-matching file, this turn)

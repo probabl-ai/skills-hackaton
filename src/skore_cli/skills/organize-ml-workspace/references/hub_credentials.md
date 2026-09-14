@@ -5,9 +5,16 @@ login`, browser OAuth, device-code prompts, `input()`, `getpass`, or
 `skore agent`). `skore agent --harness bob-ide` would also write
 `.bob/mcp.json`, which this lab must not install.
 
-Participants run `python scripts/install_skore.py` once
-(see the lab `GUIDED.md`). That writes gitignored `.skore` JSON
-(`hub_url`, `workspace`, `workspace_id`, `api_key`).
+**Before** `install_skore.py`: the Kaggle team exists, and the team
+has **exactly one** Hub workspace on https://ibm.skore.probabl.ai
+whose **name matches the Kaggle team name**. One teammate creates
+that workspace and invites the others. Nobody else creates a
+workspace. See lab `GUIDED.md` § 1 and § 3.
+
+Participants then run `python scripts/install_skore.py` once.
+That writes gitignored `.skore` JSON (`hub_url`, `workspace`,
+`workspace_id`, `api_key`). The script requires membership in
+**exactly one** Hub workspace (the team workspace).
 
 **Tool:** `load_skore_credentials()` in
 `scripts/load_skore_credentials.py` (this skill). Scaffold copies

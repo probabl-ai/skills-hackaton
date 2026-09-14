@@ -43,24 +43,31 @@ that the exception, not the default.
 
 ## Step 3.5: Explore the data before designing the model (G-EDA)
 
-Before drafting the baseline, dispatch to `explore-ml-data`. This is
-the **G-EDA** gate - binary **run** / **skip**:
+Before drafting the baseline, dispatch to `explore-ml-data`. That
+skill owns the procedure (`references/hub_share.md` when hub).
 
-- **run** → the skill places and executes `data/eda.py` via the
-  shared cell runner, writes `data/eda.md` (findings + modelling
-  implications) and `data/eda_<table>.html`, and fills the
-  `## Data understanding (EDA)` section of `JOURNAL.md`. Requires the
-  agent feature (`ipython`); if missing, `explore-ml-data` routes to
-  `python-env-manager` § Agent feature (`G-AGENT-FEATURE`) - so on the
-  run path the agent feature can get installed here, at bootstrap,
-  before the baseline. The raw data may live outside `data/`; reuse
-  the location already found when deriving the goal in Step 3 rather
-  than re-discovering it.
-- **skip** → only the `## Data understanding (EDA)` section's
-  `Status: skipped - <date>` line is written; proceed to the baseline.
-  If the user picks **run** but then **declines** the agent-feature
-  install, fall back to this skip path (record `Status: skipped`) -
-  do not loop between run and install.
+**Hub mode — lookup key `eda` first, every time:**
+
+- Key **present** → fetch into `data/eda.py` / `eda.md` / HTML if
+  local files are missing; JOURNAL `Status: done (fetched)`. No ask.
+- Key **missing**, local files already exist → `put` them, then done.
+- Key **missing**, no local files → tell the user there is **no EDA
+  on Hub** and ask **run** vs **wait** (a teammate is already
+  computing it and has not uploaded yet).
+  - **run** → place and execute `data/eda.py`, write deliverables,
+    `put` under key `eda`, fill JOURNAL `Status: done`. Needs
+    `ipython` (`G-AGENT-FEATURE`). Decline install → stay blocked;
+    do not skip.
+  - **wait** → JOURNAL `Status: waiting`. **Do not draft
+    `01_baseline`.** Stop the turn. Next message: lookup Hub again.
+    Still missing → ask wait vs run again. Appeared → fetch and
+    continue bootstrap.
+
+**Local / mlflow — binary run / skip** (unchanged):
+
+- **run** → execute `data/eda.py`, write `data/eda.md` + HTML, fill
+  JOURNAL. Needs the agent feature; decline → skip path.
+- **skip** → JOURNAL `Status: skipped`; proceed to the baseline.
 
 Why before the baseline: the dataset facts EDA surfaces (target
 balance / skew, datetime / group structure, missingness,
@@ -70,7 +77,8 @@ later at the evaluation step. Designing first and exploring later
 defeats the purpose and is the named anti-pattern.
 
 Free-text "go fast" / "quick baseline" does NOT resolve G-EDA - fire
-the `AskUserQuestion` (run / skip).
+the `AskUserQuestion` (hub: run / wait; local: run / skip). Do not
+treat **wait** as **skip**.
 
 ## Step 4: Auto-draft `journal/01_baseline.md` via the consultation chain
 
@@ -138,8 +146,8 @@ gate the workflow normally fires still fires.
 | `G-ENV-MGR` | Python env manager (`pixi`, `uv`, `poetry`, `hatch`, `conda`, `pip+venv`). The 3-feature layout (`default` / `dev` / `agent`) is enforced automatically - no scope sub-pick. | `python-env-manager` | **Before** any `pixi init` / `pixi add` / equivalent |
 | `G-TABULAR` | Tabular library (`pandas` / `polars`) + other Tier 2 contested-library picks | `data-science-python-stack` | **Before** any `Write` of `data.py` / experiment script importing the contested library |
 | `G-SKORE-MODE` | Skore Project mode (`local` / `hub` / `mlflow`) + hub workspace name or MLflow tracking URI | `organize-ml-workspace` | **Before** any `pyproject.toml` write / the skore install variant |
-| `G-EDA` | Explore the data (run / skip) | `explore-ml-data` | **Before** the `journal/01_baseline.md` draft - so EDA findings can inform the learner / metric defaults and the later CV-strategy choice |
-| `G-AGENT-FEATURE` | Install `ipython` + `pyright` (install / skip) | `python-env-manager` | **Conditional**: fires when G-EDA = run and the agent feature isn't present (the EDA cell runner needs `ipython`). Otherwise deferred to the first audit at § 4. Decline → EDA falls back to skip |
+| `G-EDA` | Explore the data (hub: lookup then fetch / run / wait; local: run / skip) | `explore-ml-data` | **Before** the `journal/01_baseline.md` draft - so EDA findings can inform the learner / metric defaults and the later CV-strategy choice |
+| `G-AGENT-FEATURE` | Install `ipython` + `pyright` (install / skip) | `python-env-manager` | **Conditional**: fires when G-EDA = run and the agent feature isn't present (the EDA cell runner needs `ipython`). Otherwise deferred to the first audit at § 4. Decline → hub stays blocked; local / mlflow EDA falls back to skip |
 | `G-DESIGN` | Explicit user approval of `journal/01_baseline.md` | `iterate-ml-experiment` § 3 | **Before** any `Write` of `experiments/01_baseline.py` / `src/<pkg>/*.py` content authored from the design note |
 | `G-CV-SPLITTER` | Cross-validator family for `skore.evaluate` (`KFold`, `GroupKFold`, `TimeSeriesSplit`, ...) | `evaluate-ml-pipeline` | **Inside the § 3 chain, AFTER G-DESIGN**: at the evaluate step, before any `Write` of `src/<pkg>/evaluate.py`; mandatory even when `split_kwargs` is empty (the empty case is itself a justified pick). NOT an upfront config gate |
 | `G-RUN` | "Run now" vs "leave for later" once smoke tests pass | `iterate-ml-experiment` § 3 | **Before** the shell call that executes `experiments/01_baseline.py` |

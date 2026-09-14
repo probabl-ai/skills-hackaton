@@ -245,8 +245,9 @@ the baseline), not only at the first audit.
   audit or EDA flow.
 - `skip` → block the calling skill; surface "audit / EDA step
   unavailable until the agent feature is installed". No silent
-  degradation. (`explore-ml-data` then falls back to its EDA-skip
-  path; `audit-ml-pipeline` blocks.)
+  degradation. (`explore-ml-data` on **local / mlflow** falls back
+  to its EDA-skip path; on **hub** it stays blocked — do not skip
+  so modelling can start. `audit-ml-pipeline` blocks.)
 
 **Persists**: `agent feature: <installed | skipped> - recorded: <date>`.
 
