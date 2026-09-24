@@ -54,7 +54,10 @@ and the per-manager install command.
 ## Step 4: Create `src/<pkg>/`
 
 Use `templates/src___init__.py` for `__init__.py` (carries
-`PROJECT_ROOT`). Use `templates/src_hub.py` for hub credentials
+`PROJECT_ROOT`). Do not create this tree with `uv init`,
+`uv init --lib`, or `poetry init`. Those write a sample `def hello()`
+and no `PROJECT_ROOT`. If one already ran, delete `hello` and replace
+`__init__.py` with the template. Use `templates/src_hub.py` for hub credentials
 (`load_skore_credentials`; call it before `login(mode="hub")`). Use `templates/src_data.py`,
 `templates/src_features.py`, `templates/src_pipeline.py`,
 `templates/src_evaluate.py` for the four modules.

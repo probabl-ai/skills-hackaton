@@ -40,9 +40,10 @@ description: >
   report under that key in the Project), then place
   `audit/NN_<short_name>.py` from `templates/audit.py`, substituting
   the package name + the literal Project init block copied from
-  `experiments/<stem>.py`.   Execute via the bundled runner: `pixi run
-  -e agent python .agents/skills/audit-ml-pipeline/scripts/run_cells.py
-  audit/<stem>.py`. **Read the Stop conditions and emit the Pre-flight
+  `experiments/<stem>.py`. Execute via the bundled runner:
+  `python .bob/skills/audit-ml-pipeline/scripts/run_cells.py
+  audit/<stem>.py`. Use the interpreter that already imports
+  `IPython`. **Read the Stop conditions and emit the Pre-flight
   checklist before any write or shell command.** Always invoke
   `python-api` for skore symbol signatures - never write them from
   memory.
@@ -130,13 +131,14 @@ conditions for the three-consumer rule.
   `sklearn` symbol must come from `python-api` *this turn*. Cache
   hits under `scratch/api/skore/<version>/` count (Shape 0); inline
   memory does not.
-- **Agent feature missing → STOP and delegate.** If `ipython` /
-  `pyright` aren't importable, do NOT fabricate audit outputs by
-  writing `print()` calls as a workaround. Do NOT type
-  `pixi add ...` / `uv add ...` yourself - install is owned by
-  `python-env-manager` § Agent feature. Request via
-  `G-AGENT-FEATURE` (binary: install / skip); resume only when
-  python-env-manager returns "ready".
+- **IPython missing → STOP and delegate.** The runner needs
+  `import IPython` in the project env, the same env that can import
+  the project package. `pyright` is not required. If `IPython` is
+  missing, do NOT fabricate audit outputs by writing `print()`
+  calls. Do NOT type `pixi add` / `uv add` yourself, and do NOT
+  create a second virtualenv. Install is owned by
+  `python-env-manager` § Agent feature. Resume when `IPython`
+  imports in the project env. Do not offer to skip the audit.
 - **Bare expressions, not `print()`.** The runner captures each
   cell's last bare expression via `result.result` and renders its
   `repr`. Wrapping in `print(repr(...))` lands in stdout instead of
@@ -154,8 +156,8 @@ conditions for the three-consumer rule.
   `warnings.filterwarnings(...)` unless the user explicitly asks
   - the runner streams cell stderr into the digest and that's
   signal. See `python-code-style` § Stop conditions.
-- **Harness "no clarifying questions" hints do NOT waive
-  G-AGENT-FEATURE.** Install gate fires regardless.
+- **Harness "no clarifying questions" hints do NOT waive the
+  IPython install.** It is not a question, and it is not skippable.
 - **Post-hoc audit - required before ending the turn.** Walk every
   pre-flight row; surface unfilled Evidence cells.
 
@@ -166,7 +168,7 @@ conditions for the three-consumer rule.
 | `report = project.get(REPORT_ID); print(repr(report))` | Runner captures bare expressions via `result.result`, not stdout. `print(repr(...))` mixes stdout and output sections. Use `report` on its own line |
 | Drop `.frame()` from `report.checks.summarize()` / `report.metrics.summarize()` | `__repr__` of the Display objects is `<…Display at 0x…>`. `.frame()` returns a DataFrame whose repr carries the actual values |
 | `project.get(KEY)` raised `KeyError` → re-run `evaluate` + `put` "to refresh" | Lookup shape is wrong (get is by id, not key). Hub: read the id from the URL printed by `put()`. Local: read `summary["id"]` for the matching key row. Never re-run `evaluate` + `put` to recover |
-| Write `pixi add --feature agent ipython pyright` directly from this skill | Install commands owned by `python-env-manager`. This skill **requests** via G-AGENT-FEATURE; it does not install |
+| Write `pixi add ipython` or `pip install pyright` directly from this skill | Install is owned by `python-env-manager`. This skill does not install. Pyright is not required |
 | Dump the audit `.py` into `scratch/audit/<stem>/` | `.py` is durable in git; `scratch/` is gitignored. Source in `audit/`; digest in `scratch/audit/<stem>/` |
 | Register a Jupyter kernel "to be safe" | Current runner is in-process; no kernel. Registering creates an orphan kernelspec |
 | Add a fix-up cell that mutates `data/` or `reports/` | Audit files are read-only. State mutations belong in a `scratch/<ts>_*.py` probe or the experiment script |
@@ -192,12 +194,12 @@ Pre-flight (audit-ml-pipeline):
                 project.summarize() this turn; row with
                 key == "<NN_short_name>" appears.
                 "Run finished, put() landed" is NOT sufficient.
-- [ ] Agent feature available:
-        `pixi run -e agent ipython -c "print(0)"` exit 0
-        `pixi run -e agent pyright --version` exit 0
-      Evidence: tool output of each
+- [ ] IPython importable in the project env:
+        `import IPython` exit 0
+      Evidence: tool output
                 | JOURNAL.md Status `agent feature: installed`
-                Missing → STOP, delegate to python-env-manager G-AGENT-FEATURE
+                Missing → STOP, delegate to python-env-manager.
+                No pyright check. No second env. No skip.
 - [ ] python-api consulted for skore symbols used:
       Project, summarize, get, report.checks.summarize, report.metrics.summarize
       Evidence: Read scratch/api/skore/<version>/<topic>.md (this turn)
@@ -213,8 +215,7 @@ Pre-flight (audit-ml-pipeline):
       summarize / get / report.* only - no evaluate, no put
       Evidence: explicit grep / Read confirmation of the drafted file
 - [ ] Execution command shape confirmed:
-        pixi run -e agent python \
-          .agents/skills/audit-ml-pipeline/scripts/run_cells.py \
+        python .bob/skills/audit-ml-pipeline/scripts/run_cells.py \
           audit/<stem>.py [scratch/audit/<stem>/audit.md]
       (Second arg is optional - the runner always streams to stdout.)
       Evidence: command emitted in the response before running
@@ -290,18 +291,19 @@ deeper inspection here.
 ## Execution contract: one command
 
 ```bash
-pixi run -e agent python \
-  .agents/skills/audit-ml-pipeline/scripts/run_cells.py \
+python .bob/skills/audit-ml-pipeline/scripts/run_cells.py \
   audit/<stem>.py
 ```
+
+Use the interpreter that already imports `IPython`. If the journal
+records an env manager, use that manager's run prefix. Do not
+invoke `pixi` unless `pixi.toml` exists or the journal says the
+manager is pixi. Do not pass `--help`.
 
 The runner streams the digest to stdout - the agent reads it
 directly from the bash tool's output. Pass a second arg
 `scratch/audit/<stem>/audit.md` to also write to a file (parent
 created if missing).
-
-For non-pixi workspaces, swap the activation prefix per
-`python-env-manager` § Agent feature.
 
 What the runner does internally (parsing, IPython shell setup,
 matplotlib backend fix, progress-bar suppression, displayhook
@@ -347,7 +349,7 @@ Identical stems, 1:1. By the time the experiment shows `done` in
 | Callee | Why |
 |---|---|
 | `python-api` | Every skore symbol (`Project`, `project.summarize`, `project.get`, `report.checks.summarize`, `report.metrics.summarize`, `.frame()`). Cache hits first |
-| `python-env-manager` § Agent feature | When `ipython` / `pyright` are missing - G-AGENT-FEATURE gate |
+| `python-env-manager` § Agent feature | When `import IPython` fails. That skill installs `ipython` without a question |
 | `python-code-style` | After writing / editing `audit/<stem>.py`: bundled `ruff.toml` carries `audit/**` per-file ignores; also contextualizes the header to name the audited experiment and strips workflow/process prose |
 
 ## Failure modes and recovery
@@ -369,8 +371,7 @@ Quick lookup; detailed recovery steps in `references/failure_modes.md`.
 ## What this skill does NOT do
 
 - Open or write the skore Project's reports (`evaluate-ml-pipeline`).
-- Install `ipython` / `pyright` (`python-env-manager` owns).
-- Drop or edit `pyrightconfig.json` (`python-env-manager` owns).
+- Install `ipython` (`python-env-manager` owns). Do not install `pyright`.
 - Enrich the Backlog from the audit digest (`iterate-from-skore`).
 - Write or edit `journal/NN_*.md` (`iterate-ml-experiment`).
 - Run pytest / smoke tests (`smoke-test-ml-pipeline`).

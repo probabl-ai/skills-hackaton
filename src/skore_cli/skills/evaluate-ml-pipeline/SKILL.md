@@ -67,6 +67,11 @@ read the report. The pipeline declaration is out of scope (see
   never reach for `KFold(5)` or `StratifiedKFold` out of habit. If
   `split_kwargs` is empty *and* you cannot rule out group / temporal
   structure, return to `build-ml-pipeline` and ask before defaulting.
+  **Lab exception:** when `docs/GUIDED.md` exists, `01_dummy` and
+  `02_ridge` pass `splitter=0.2` and do not ask this gate. The
+  ask opens on the guide's patient-grouped section
+  (`iterate-ml-experiment/references/lab_guide.md`). A student who
+  asks for a grouped split earlier is answered here, not deferred.
 - **No `Stratified*` for class imbalance.** It compresses across-fold
   variance and produces over-confident error bars. Imbalance does
   not change the splitter choice.

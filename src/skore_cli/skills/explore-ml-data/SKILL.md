@@ -13,23 +13,25 @@ description: >
   user understands *why* the modelling choices are made. Uses
   `skrub.TableReport` for dataframe overviews and the shared runner
   `audit-ml-pipeline/scripts/run_cells.py`. Stops at "EDA executed,
-  `data/eda.md` + HTML written, JOURNAL EDA section updated." Never
+  `data/eda.md` + HTML written, JOURNAL EDA section updated." An
+  explicit request to understand the data writes those files even
+  when the workspace is not scaffolded. Do not load
+  `organize-ml-workspace`. Do not create `experiments/`. Never
   designs the model, never edits `src/<pkg>/`, never modifies the
   user's raw data files.
 
   TRIGGER - any of:
   - `iterate-ml-experiment` § 0 bootstrap, BEFORE the baseline design
-    note - the G-EDA gate fires here (run / skip).
+    note - after `G-EDA` is answered `run` or `re-run`. The ask
+    itself ends the previous turn. Do not place `data/eda.py` in
+    the ask turn.
   - The user asks to "explore the data", "do an EDA", "profile the
-    dataset", "what does the data look like", "understand the data".
+    dataset", "what does the data look like", "understand the data",
+    or otherwise wants to understand the dataset before any modelling.
   - A new or changed data source needs (re-)understanding before the
     next experiment.
 
-  SKIP when: the workspace isn't scaffolded / bootstrapped yet -
-  `iterate-ml-experiment` § 0 owns bootstrap ordering and will
-  dispatch here at the G-EDA step; don't run standalone ahead of
-  scaffolding (route to `iterate-ml-experiment` / `organize-ml-
-  workspace`); there is no data to explore yet; the user wants to
+  SKIP when: there is no data to explore yet; the user wants to
   inspect a finished run's skore report rather than the raw dataset
   (`audit-ml-pipeline`); the user is past data understanding and wants
   pipeline / evaluation mechanics (`build-ml-pipeline` /
@@ -37,13 +39,18 @@ description: >
   already recorded (`data/eda.md` + the JOURNAL EDA section exist) and
   the user is not asking to refresh it.
 
-  HOW TO USE: run the Detection step (does `data/eda.md` + the JOURNAL
-  EDA section already exist?), emit the Pre-flight checklist as
-  visible text, read the Stop conditions, then place `data/eda.py`
-  from `templates/eda.py`, execute it via the shared runner, read the
-  digest, and author `data/eda.md` + the JOURNAL EDA section. Always
-  resolve skrub / pandas / polars symbols via `python-api`, never from
-  memory.
+  HOW TO USE: three exclusive cases. An explicit request to explore
+  the data writes the files in that turn and does not ask `G-EDA`.
+  On bootstrap, before any answer, `G-EDA` is one `AskUserQuestion`
+  (id `G-EDA`) and that ask ends the turn. Do not place
+  `data/eda.py`. A missing `data/eda.md` is not `run`. After the
+  user answers `run` or `re-run`, run the Detection step, emit the
+  Pre-flight checklist as visible text, read the Stop conditions,
+  then place `data/eda.py` from `templates/eda.py`, execute it once
+  via the shared runner with the digest path, read that file, and
+  author `data/eda.md` + the JOURNAL EDA section.
+  Do not probe skrub before the first run. Do not load
+  `python-code-style`.
 ---
 
 # Explore ML Data
@@ -53,6 +60,23 @@ EDA per workspace: an executable `data/eda.py`, a persisted
 `data/eda.md` narrative, rich `data/eda_<table>.html` reports, and a
 short JOURNAL section that links them. The findings feed the baseline
 design note's learner / splitter / metric choices.
+
+## Explicit explore request
+
+When the user asks to explore or understand the data, write
+`data/eda.py`, `data/eda.md`, the HTML reports, and the journal EDA
+section, then stop. Detection is one shell command covering the raw
+file, `data/eda.md`, and `journal/`. Do not follow it with `which`,
+import probes, or another listing. Ask the user which column is the
+target before substituting `<TARGET_COLUMN>`. Create
+`journal/JOURNAL.md` from
+`.bob/skills/iterate-ml-experiment/templates/JOURNAL.md` if it is
+missing, and write that EDA section. Also write the `tabular library`
+row in `Workspace decisions` from the import in `data/eda.py` when
+that row is still a placeholder. Do not load `organize-ml-workspace`.
+Do not create `experiments/` or a baseline script. `data/eda.py`
+locates the repo from its own path, so this does not wait on
+`src/<pkg>/`.
 
 ## Next-step pointers: where you go after this skill
 
@@ -75,13 +99,18 @@ the splitter (`G-CV-SPLITTER`), the metric default, and the learner
 default. Running EDA after the model is designed defeats the purpose.
 
 ```
-scaffold → JOURNAL → goal from data/README.md
+If data/eda.md already exists, re-run vs keep is the first question,
+before env manager and tabular library. That ask ends the turn.
+Otherwise: scaffold → JOURNAL → goal from data/README.md
    │
-   └─► G-EDA (run | skip)  ◄── this skill
-         │ run
+   └─► AskUserQuestion id=G-EDA (run | skip)  - this turn ends here
+         │ next turn, answer=run
          └─► data/eda.py → execute → data/eda.md + HTML + JOURNAL §EDA
+             + tabular library row when it was still a placeholder
+         │ next turn, answer=skip
+         └─► JOURNAL Status: skipped
    │
-   └─► auto-draft 01_baseline.md  (cites the EDA findings)
+   └─► same next turn: draft 01_baseline.md  (cites the EDA findings)
 ```
 
 ## Where things live: visual map
@@ -115,7 +144,9 @@ The central rule. Surfaced as the first Stop condition below.
 - `data/eda.md`: the authored narrative.
 - `data/eda_<table>.html`: the skrub `TableReport` pages.
 - `scratch/eda/`: the ephemeral digest.
-- `journal/JOURNAL.md` § Data understanding (EDA).
+- `journal/JOURNAL.md` § Data understanding (EDA), plus the
+  `tabular library` row in `Workspace decisions` when `data/eda.py`
+  imports pandas or polars and that row is still a placeholder.
 
 **Forbidden:**
 
@@ -142,27 +173,42 @@ The central rule. Surfaced as the first Stop condition below.
   (`data/`, another in-repo folder, an absolute or external path) -
   decouple the two: a `RAW = <LOAD_RAW_DATA>` source vs an `EDA_DIR`
   output. Never assume the raw data is in `data/`.
+- **Shared EDA when `docs/GUIDED.md` exists.** Before offering
+  **run**, follow `iterate-ml-experiment/references/lab_guide.md`
+  § Shared EDA. Hub key `eda` already stored → fetch, record
+  JOURNAL status `done`, and do not ask **re-run**. A teammate
+  still computing → **wait**. The key `eda` is never a model report.
 - **EDA precedes model design (G-EDA).** In bootstrap, the gate fires
-  **before** `journal/01_baseline.md` is drafted. It is binary:
-  **run** (place + execute `data/eda.py`, write the deliverables) or
-  **skip** (record `Status: skipped - <date>` in the JOURNAL section
-  and proceed). Do not silently bypass - fire the `AskUserQuestion`.
-  Free-text "go fast" / "quick baseline" does NOT resolve it.
-- **Agent feature required to execute.** The cell runner needs
-  `ipython`. If it is missing and the user chose **run**, STOP and
-  delegate to `python-env-manager` § "Agent feature"
-  (`G-AGENT-FEATURE`). Do NOT type `pixi add ... ipython` yourself;
-  do NOT fabricate EDA output with hand-written `print()`s. If the
-  user declines the agent feature, **fall back to the skip path**
-  (record `Status: skipped`) - never loop between run and install.
-- **Symbol from memory is forbidden.** Any `skrub` / `pandas` /
-  `polars` symbol (`TableReport`, `TableReport.json`, `write_html`,
-  `column_associations`, the tabular reader, …) must come from
-  `python-api` *this turn*. Cache hits under
-  `scratch/api/<lib>/<version>/` count; inline memory does not.
-  **`TableReport.json()`'s key names are not formally documented and
-  drift across skrub versions - confirm them via `python-api` and
-  parse defensively (`.get(...)`).**
+  **before** `journal/01_baseline.md` is drafted. It is one
+  `AskUserQuestion`, id `G-EDA`. Options are `run` and `skip`, or
+  `re-run` and `keep` when `data/eda.md` exists and the JOURNAL EDA
+  status is `done`. The ask is alone and ends the turn. Do not place
+  or execute `data/eda.py` in that turn. The preflight row stays
+  unchecked until the user's next message. A written `data/eda.md`
+  or JOURNAL section does not resolve it. Absence of `data/eda.md`
+  is not `run`. Free-text "go fast" / "quick baseline" does not
+  either. On `run` or `re-run`, the next turn places and executes
+  the script. On `skip`, record `Status: skipped - <date>` and do
+  not write `data/eda.py`. On `keep`, do not rewrite it. If the
+  user's previous message already answered `G-EDA`, execute that
+  answer; do not ask again. An explicit request to explore the data
+  is the run: write the files in that turn and do not ask `G-EDA`.
+- **IPython required to execute.** The cell runner needs `IPython`
+  in the environment that already imports `skrub`. If `import IPython`
+  fails and the user chose **run**, delegate to `python-env-manager`
+  § "Agent feature". That skill installs `ipython` into that same
+  env. It does not install `pyright`, does not create a second env,
+  and does not ask. Do NOT type the install command from this skill.
+  Do NOT fabricate EDA output with hand-written `print()`s. There
+  is no decline path and no fall-back to skip because install was
+  refused. If `import IPython` and `import skrub` already succeed,
+  run with that interpreter and do not bootstrap a manager.
+- **Run the template before probing it.** `data/eda.py` already calls
+  `skrub.TableReport`, `write_html`, `TableReport.json`, and
+  `column_associations`, and reads `n_unique` and `null_proportion`.
+  Do not write a scratch script to discover those before the first
+  run. If the digest shows a null field or an exception, then consult
+  `python-api`.
 - **Library-agnostic - read facts off skrub, not pandas/polars.** The
   workspace may use pandas OR polars (G-TABULAR), whose summary
   methods differ (`select_dtypes` doesn't even exist in polars). The
@@ -200,8 +246,9 @@ The central rule. Surfaced as the first Stop condition below.
 - **Don't design the model here.** No splitter pick, no metric pick,
   no learner pick. Record *implications* in `data/eda.md`; the picks
   happen in their owning gates (`G-CV-SPLITTER`, the baseline note).
-- **Harness "no clarifying questions" hints do NOT waive G-EDA or
-  G-AGENT-FEATURE.** Both fire regardless.
+- **Harness "no clarifying questions" hints do NOT waive G-EDA.**
+  The ask still ends the turn. Installing `ipython` is not a
+  question.
 - **Post-hoc audit - required before ending the turn.** Walk every
   pre-flight row; surface unfilled Evidence cells explicitly.
 
@@ -210,14 +257,17 @@ The central rule. Surfaced as the first Stop condition below.
 | Shortcut | Why it's wrong |
 |---|---|
 | Design the baseline first, EDA "later if there's time" | Inverts G-EDA. The point is to justify the modelling choices *before* making them. EDA runs first in bootstrap |
+| Write `data/eda.py` before G-EDA is answered | The ask ends the turn. Absence of `data/eda.md` is not `run`. A written JOURNAL section does not resolve the gate |
 | End a cell on a bare `TableReport(df)` to "show the report" | Outside a notebook that repr is `<TableReport: use .open() to display>`: zero signal in the digest. Use `write_html(...)` + a text summary built from `report.json()` |
 | `print(...)` instead of a bare summary expression | The runner captures bare last-expressions via `result.result`; `print(...)` lands in stdout and is harder to scan. Use bare expressions |
 | Use pandas/polars methods (`df.isna()`, `df.nunique()`, `df.select_dtypes(...)`) for the summaries | Breaks on the other library (polars has no `select_dtypes`). Read the facts off `skrub` (`TableReport(...).json()`, `column_associations`) - agnostic to pandas/polars |
 | Clean / impute / drop columns in `data/eda.py` and re-save the raw file | EDA is read-only against raw data. Cleaning belongs in the pipeline (`build-ml-pipeline`), applied at fit time for train/test consistency |
 | Assume the raw data is in `data/` | The raw source may live anywhere; only the deliverables are pinned to `data/`. Set `RAW = <LOAD_RAW_DATA>` to wherever the data actually is |
 | Gitignore the whole `data/` folder | The committed deliverables (`data/eda.*`) live there. Ignore only specific input patterns, and ask the user first |
-| Run EDA without the agent feature by hand-writing the expected output | Fabricated EDA is worse than none. Missing runner → G-AGENT-FEATURE (install) or the skip path |
-| `pixi add ipython` directly from this skill | Install is owned by `python-env-manager`. This skill *requests* via G-AGENT-FEATURE |
+| Run EDA without IPython by hand-writing the expected output | Fabricated EDA is worse than none. Missing `import IPython` → `python-env-manager` installs `ipython` into the project env, then the run continues. No Pyright install and no second env |
+| `pixi add ipython` directly from this skill | Install is owned by `python-env-manager`. This skill does not type the install command |
+| Load `python-code-style` or write `ruff.toml` on an explore turn | The bare last expressions in `data/eda.py` are the cell outputs and already carry `# noqa: B018` |
+| Scaffold `src/<pkg>/` because `from <pkg> import PROJECT_ROOT` would fail | `data/eda.py` sets `PROJECT_ROOT` from `Path(__file__)`. A missing package is not a scaffold |
 | Drop the authored `data/eda.md` and leave only the HTML | The `.md` carries the modelling implications the baseline note cites and the JOURNAL section links. Both are required |
 | Invent column meanings not visible in the data | Report what the data shows. Domain semantics the user didn't state go in an explicit "open questions" list, not as asserted fact |
 | Forget the JOURNAL § Data understanding update | The section is the index entry; without it later sessions can't find the EDA. It is part of "done" |
@@ -231,13 +281,17 @@ Pre-flight (explore-ml-data):
 - [ ] Detection: EDA already present? data/eda.md + JOURNAL §EDA
       Evidence: ls / Glob on data/eda.md + Read JOURNAL §EDA
                 | "n/a - first EDA"
-- [ ] G-EDA resolved: run | skip
-      Evidence: AskUserQuestion id=<id>, answer=<run|skip>
-                | user free-text quote turn N
+- [ ] G-EDA resolved: run | skip | re-run | keep
+      Evidence: AskUserQuestion id=G-EDA, and the user's next message
+                | explicit explore request this turn (no ask)
+      The ask ends the turn. Do not check this box in the ask turn.
       If skip: JOURNAL §EDA records "Status: skipped - <date>"; STOP here.
 - [ ] Tabular library known (G-TABULAR): pandas | polars
-      Evidence: JOURNAL.md Status (Workspace decisions) | AskUserQuestion
+      Evidence: JOURNAL.md Status (Workspace decisions) with a concrete
+                value and a date | import already in data/eda.py
+                (write that row; do not ask) | AskUserQuestion
                 via data-science-python-stack
+      Angle brackets in the journal row are not a decision.
 - [ ] Raw data located (may be outside data/): <paths / loader>
       Evidence: ls / Glob on the data location + the RAW load call placed
                 in data/eda.py | user-quoted path turn N
@@ -245,26 +299,29 @@ Pre-flight (explore-ml-data):
       Evidence: `git check-ignore data/eda.md` returns nothing
                 | AskUserQuestion id=<id> on ignoring specific inputs
                 | "n/a - no .gitignore yet"
-- [ ] Agent feature available (run path only):
-        `pixi run -e agent ipython -c "print(0)"` exit 0
-      Evidence: tool output | JOURNAL.md Status `agent feature: installed`
-                Missing → STOP, delegate to python-env-manager G-AGENT-FEATURE
-                (decline → fall back to skip path)
+- [ ] IPython importable in the env that already imports skrub
+      Evidence: `import IPython` in that interpreter
+                | JOURNAL.md Status `agent feature: installed`
+                Missing → python-env-manager installs ipython into that
+                env (import is IPython; no pyright; no second env; no ask)
 - [ ] python-api consulted for symbols used:
         skrub.TableReport, TableReport.write_html, TableReport.json,
         skrub.column_associations, the tabular reader (load cell only)
       Evidence: Read/Write scratch/api/<lib>/<version>/<topic>.md (this turn)
-                | "n/a - cache hit + Read this turn"
+                | "n/a - first run of templates/eda.py; probe only if the
+                  digest shows a null field or an exception"
 - [ ] Template copy + substitution decided:
-        <pkg> → package name from src/<pkg>/
         <LOAD_RAW_DATA> → the real loader, pointing wherever the data lives
         <TARGET_COLUMN> → the target (from goal / data/README.md), or n/a
         <table> → short slug per table for eda_<table>.html
-      Evidence: Read templates/eda.py this turn before Write data/eda.py
+      Evidence: Read .bob/skills/explore-ml-data/templates/eda.py this turn
+                before Write data/eda.py
 - [ ] Execution command shape confirmed:
-        pixi run -e agent python \
-          .agents/skills/audit-ml-pipeline/scripts/run_cells.py \
-          data/eda.py [scratch/eda/eda.md]
+        python .bob/skills/audit-ml-pipeline/scripts/run_cells.py \
+          data/eda.py scratch/eda/digest.md
+      Use the interpreter that already imports skrub and IPython.
+      Do not prefix with `pixi` unless pixi.toml exists or the journal
+      says the manager is pixi.
       Evidence: command emitted before running
 - [ ] Deliverables written: data/eda.md (prose + implications),
         data/eda_<table>.html (≥1), JOURNAL §Data understanding
@@ -283,7 +340,6 @@ anatomy with right / wrong shapes: → `references/cell_anatomy.md`.
 
 | Placeholder | Replaced with |
 |---|---|
-| `<pkg>` | The importable package name (from `src/<pkg>/`); used for `from <pkg> import PROJECT_ROOT` (only to locate `EDA_DIR = PROJECT_ROOT / "data"`) |
 | `<LOAD_RAW_DATA>` | The real load of the raw file(s), pointing wherever the data lives (in `data/`, another folder, an absolute path, or external). Uses the workspace tabular lib (pandas/polars); skrub accepts both. The one library-specific line |
 | `<TARGET_COLUMN>` | The target column name (from the goal / `data/README.md`), or remove the target cell if unsupervised / unknown |
 | `<table>` | A short slug per table for the HTML filename (`eda_<table>.html`) - for a single table use the dataset name |
@@ -295,10 +351,12 @@ Brief outline; concrete examples → `references/cell_anatomy.md`.
 1. **Module docstring (markdown)**: what this file is, the
    read-only-against-raw-data rule, raw-vs-deliverables split, how it
    is executed.
-2. **Imports + paths (code)**: `import json`, `import skrub`,
-   `from <pkg> import PROJECT_ROOT`, `EDA_DIR = PROJECT_ROOT / "data"`
+2. **Imports + paths (code)**: `import json`, `from pathlib import
+   Path`, `import skrub`,
+   `PROJECT_ROOT = Path(__file__).resolve().parents[1]`,
+   `EDA_DIR = PROJECT_ROOT / "data"`
    (+ `EDA_DIR.mkdir(parents=True, exist_ok=True)`). No pandas/polars
-   import here.
+   import here. The runner sets `__file__`.
 3. **Load raw data (code, bare expression)**: `RAW = <LOAD_RAW_DATA>`
    pointing wherever the data lives; end on `RAW.shape`.
 4. **Per-table overview (code)**: `report = skrub.TableReport(RAW,
@@ -329,28 +387,37 @@ very large data, load a row sample (see `references/cell_anatomy.md`).
 ## Execution contract: one command
 
 ```bash
-pixi run -e agent python \
-  .agents/skills/audit-ml-pipeline/scripts/run_cells.py \
-  data/eda.py
+mkdir -p scratch/eda
+python .bob/skills/audit-ml-pipeline/scripts/run_cells.py \
+  data/eda.py scratch/eda/digest.md
 ```
 
-The runner (shared with `audit-ml-pipeline`) streams the digest to
-stdout - the agent reads it directly from the bash tool output. Pass
-a second arg `scratch/eda/eda.md` to also write the digest to a file.
-For non-pixi workspaces, swap the activation prefix per
-`python-env-manager` § "Agent feature".
+Run that command once. Do not pipe it through `tail`. Read
+`scratch/eda/digest.md` for the cell outputs. Use the interpreter
+that already imports `skrub` and `IPython`. If the journal records
+an env manager, use that manager's run prefix. If none is recorded,
+run plain `python`, or `python3` when that is the interpreter that
+already imports those packages. Do not invoke `pixi` unless
+`pixi.toml` exists or the journal says the manager is pixi. If those
+imports already succeed, do not offer to install a manager or write
+an env manifest.
 
 **This skill ships no runner of its own**: there is no
 `explore-ml-data/scripts/`. Always invoke the shared
-`audit-ml-pipeline/scripts/run_cells.py` at the path above; don't
-look for or fork a local copy.
+`.bob/skills/audit-ml-pipeline/scripts/run_cells.py`. Do not edit
+that file and do not pass it `--help`. The runner sets `__file__`
+to the script path.
 
-**Prerequisites for the run path:** the workspace package must be
-importable (`from <pkg> import PROJECT_ROOT`: editable install done
-during scaffold) and `skrub` installed (Tier 1). If either import
-fails, the digest shows the `ImportError`; route to
-`python-env-manager` for the missing piece rather than working around
-it.
+Do not load `python-code-style` and do not copy `ruff.toml` on an
+explore turn. The bare last expressions in `data/eda.py` are the
+cell outputs and already carry `# noqa: B018`.
+
+**Prerequisites for the run path:** `skrub` must be installed.
+`data/eda.py` sets `PROJECT_ROOT` from
+`Path(__file__).resolve().parents[1]`. A missing `src/<pkg>/`
+import is not a reason to scaffold. If `skrub` is missing, route to
+`python-env-manager` for that install only. If `IPython` is missing,
+that same skill installs `ipython` into this env.
 
 ### Re-execution semantics
 
@@ -407,17 +474,16 @@ detail lives in `data/eda.md`. On the **skip** path, only the
 
 | Caller | When |
 |---|---|
-| `iterate-ml-experiment` § 0 bootstrap | Automatic; G-EDA fires **before** the baseline design note |
+| `iterate-ml-experiment` § 0 bootstrap | After `G-EDA` is answered `run` or `re-run`. The ask ended the previous turn |
 | User free-text | "explore the data", "do an EDA", "profile the dataset" - resolves directly |
 
 ### Calls into
 
 | Callee | Why |
 |---|---|
-| `python-env-manager` § Agent feature | When `ipython` is missing on the run path - G-AGENT-FEATURE |
-| `python-api` | Every skrub / pandas / polars symbol. Cache hits first |
-| `data-science-python-stack` | G-TABULAR (pandas / polars) if not yet recorded; skrub `TableReport` reference |
-| `python-code-style` | After writing `data/eda.py`: ruff format / check + contextualize the comments to this dataset (strip any leftover workflow/process prose) |
+| `python-env-manager` § Agent feature | When `import IPython` fails in the env that already imports `skrub`. That skill installs `ipython` there, without a question |
+| `python-api` | After the first run, only if the digest shows a null field or an exception |
+| `data-science-python-stack` | G-TABULAR (pandas / polars) if not yet recorded and `data/eda.py` does not already import one |
 
 ## What this skill does NOT do
 
@@ -427,7 +493,7 @@ detail lives in `data/eda.md`. On the **skip** path, only the
   for those picks.
 - Edit `src/<pkg>/` or the experiment / audit files.
 - Clean, transform, or re-save the user's raw data.
-- Install `ipython` / `pyright` (`python-env-manager` owns).
+- Install `ipython` (`python-env-manager` owns). Do not install `pyright`.
 - Open or write the skore Project.
 - Render commits or PRs.
 
@@ -438,15 +504,14 @@ detail lives in `data/eda.md`. On the **skip** path, only the
 | `iterate-ml-experiment` | Caller. § 0 fires G-EDA before the baseline note; the EDA findings seed the note's Method / Risks |
 | `audit-ml-pipeline` | Owns the shared cell runner `scripts/run_cells.py` this skill executes; same bare-expression discipline |
 | `organize-ml-workspace` | Workspace layout; `data/` is user-owned - this skill is the one exception that writes `data/eda.*` into it |
-| `python-env-manager` | Agent feature install (G-AGENT-FEATURE). This skill requests; that skill installs |
-| `python-api` | skrub / pandas / polars symbol lookups. Cache hits first |
+| `python-env-manager` | Installs `ipython` into the project env when `import IPython` fails. This skill does not install it |
+| `python-api` | skrub / pandas / polars symbol lookups after a failed or null digest. Cache hits first |
 | `data-science-python-stack` | G-TABULAR; skrub `TableReport` is catalogued there |
-| `python-code-style` | ruff after writing `data/eda.py` |
 
 ## Templates and assets
 
-- `templates/eda.py`: the `data/eda.py` skeleton. Copy + substitute;
-  don't rewrite from memory.
+- `.bob/skills/explore-ml-data/templates/eda.py`: the `data/eda.py`
+  skeleton. Copy + substitute; don't rewrite from memory.
 - `templates/eda.md`: the `data/eda.md` report skeleton.
 
 The cell runner is **not** owned here - it is

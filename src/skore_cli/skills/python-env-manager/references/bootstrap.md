@@ -40,14 +40,16 @@ pixi init
 Creates `pixi.toml` in the current directory. The default
 generated content is minimal; the next step replaces it.
 
-### 3. Apply the enforced 4-env layout
+### 3. Apply the env layout
 
-No user ask - the layout is the convention (SKILL.md § "Where does
-the package belong?"). Edit `pixi.toml`:
+No user ask for extra envs. Edit `pixi.toml` with `default` and
+`dev` only. Do not add an `agent` or `lsp` feature and do not add
+`pyright`. `ipython` goes in `default` with the project stack so
+the cell runner uses the same env.
 
 ```toml
 [feature.default.dependencies]
-# runtime deps land here (added in step 5)
+# runtime deps land here (added in step 4), including ipython
 
 [feature.dev.dependencies]
 ruff = "*"
@@ -55,20 +57,10 @@ pytest = "*"
 jupyterlab = "*"
 ipykernel = "*"
 
-[feature.agent.dependencies]
-ipython = "*"
-pyright = "*"
-
 [environments]
 default = { features = ["default"],                       solve-group = "default" }
 dev     = { features = ["default", "dev"],                solve-group = "default" }
-agent   = { features = ["default", "agent"],              solve-group = "default" }
-lsp     = { features = ["default", "dev", "agent"],       solve-group = "default" }
 ```
-
-The `lsp` env composes every feature so the opencode LSP /
-pyright sees every import path the user could write across `src/`
-/ `tests/` / `experiments/` / `audit/`.
 
 ### 4. Add Tier 1 runtime deps to `default`
 
@@ -95,14 +87,13 @@ If G-SKORE-MODE hasn't fired yet at bootstrap time (rare -
 `organize-ml-workspace` fires it alongside G-PKG-NAME and
 G-TABULAR), route back to that skill before issuing the install
 command. `ruff` / `pytest` / `jupyterlab` / `ipykernel` are added
-by step 3 (the `[feature.dev]` declaration); `ipython` / `pyright`
-are added by step 3 (the `[feature.agent]` declaration). No
-per-install ask needed - the layout dictates the routing.
+by step 3 (the `[feature.dev]` declaration). `ipython` is added to
+`default` with `pixi add ipython` when EDA or the audit will run.
+No per-install ask. Do not add `pyright`.
 
-**macOS post-install:** because skrub just landed, run
-`pixi run dot -c` (or the manager-equivalent env-run) once on macOS
-to rebuild graphviz's plugin cache - see SKILL.md § "skrub install
-- macOS post-install". Linux + Windows: skip.
+**Graphviz:** do not install it in this bootstrap. EDA and the
+baseline holdout do not need `dot`. Follow SKILL.md § "Graphviz"
+only when a later plot or `draw_graph` / `full_report` asks for it.
 
 ### 5. Add the tabular library
 
@@ -129,34 +120,24 @@ Then `pixi install`. The name-prefixed `<pkg> @ .` syntax is
 required by pixi 0.69; the bare `--editable .` form is rejected
 with `× URL requirement must be preceded by a package name`.
 
-### 7. Drop `pyrightconfig.json`
-
-```bash
-sed -e 's|<PYTHON_PATH>|.pixi/envs/lsp/bin/python|g' \
-    .agents/skills/python-env-manager/templates/pyrightconfig.json \
-    > ./pyrightconfig.json
-```
-
-### 8. Sync all four envs
+### 7. Sync default and dev
 
 ```bash
 pixi install                # syncs default
 pixi install -e dev
-pixi install -e agent
-pixi install -e lsp         # largest of the four; what pyright reads from
 ```
 
-### 9. Verify
+Do not create an `agent` or `lsp` env. Do not write
+`pyrightconfig.json`.
+
+### 8. Verify
 
 ```bash
-pixi run python -c "import sklearn, skrub, skore"   # Tier 1
-pixi run -e dev ruff --version                       # dev
-pixi run -e agent ipython -c "print(0)"              # agent
-pixi run -e agent pyright --version                  # agent
-ls pyrightconfig.json                                # config dropped
+pixi run python -c "import sklearn, skrub, skore, IPython"
+pixi run -e dev ruff --version
 ```
 
-All commands must succeed before declaring the bootstrap complete.
+Both commands must succeed before declaring the bootstrap complete.
 
 ## Other managers
 
@@ -165,12 +146,8 @@ conda), mirror this flow with:
 
 - The manager's `init` command (uv `init`, poetry `init`, hatch
   `new`, conda `create -n <project>`).
-- The analogous 4-env mapping from SKILL.md § "Install commands -
-  by manager" (uv groups, poetry groups, hatch envs, conda named
-  envs).
+- `ipython` in the same env as `skrub`, not a second env.
 - The per-manager editable install from
   `references/editable_workspace.md`.
-- The per-manager `<PYTHON_PATH>` substitution from
-  `references/agent_feature_anatomy.md`.
 
-The 9-step shape is identical; only the commands change.
+Do not add `pyright` and do not write `pyrightconfig.json`.

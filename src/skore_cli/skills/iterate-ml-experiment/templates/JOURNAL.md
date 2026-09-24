@@ -20,12 +20,16 @@ Workspace decisions: one-time project-setup choices. Record each when
 it is made and treat it as fixed unless you deliberately change one
 (e.g. switch pandas → polars), updating the recorded date. Reading
 this block on later sessions avoids re-deciding what's already settled.
+
+A row is recorded only when the value is a concrete choice and a date.
+Angle brackets left in the value (`<pandas | polars>`, `<YYYY-MM-DD>`)
+mean this template is still here. That is not a decision.
 -->
 
 - **Workspace decisions** (immutable unless the user pivots):
   - tabular library: <pandas | polars> - recorded: <YYYY-MM-DD>
   - env manager: <pixi | uv | poetry | hatch | conda | pip+venv> - recorded: <YYYY-MM-DD>
-  - agent feature: <installed | skipped> - recorded: <YYYY-MM-DD>
+  - agent feature: <installed> - recorded: <YYYY-MM-DD>
   - optional features: <name1, name2 | none> - recorded: <YYYY-MM-DD>
   - package name (`src/<pkg>/`): <pkg> - recorded: <YYYY-MM-DD>
   - skore mode: <local | hub | mlflow> - recorded: <YYYY-MM-DD>

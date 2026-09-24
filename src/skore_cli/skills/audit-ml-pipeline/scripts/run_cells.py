@@ -233,6 +233,9 @@ def run(src_path: Path, out_path: Path | None = None) -> None:
     """
     cells = parse_cells(src_path.read_text(encoding="utf-8"))
     shell = make_shell()
+    # IPython's shell has no script path. EDA files locate the repo with
+    # Path(__file__).resolve().parents[1].
+    shell.user_ns["__file__"] = str(src_path.resolve())
     md: list[str] = [f"# Cells: `{src_path}`\n"]
     for i, (marker, body) in enumerate(cells):
         md.append(f"\n## Cell {i}: `{marker}`\n")
@@ -281,8 +284,8 @@ def main(argv: list[str] | None = None) -> int:
         ``0`` on success, ``2`` on wrong argument count.
     """
     args = sys.argv[1:] if argv is None else argv
-    if not (1 <= len(args) <= 2):
-        print(__doc__, file=sys.stderr)
+    if any(arg.startswith("-") for arg in args) or not (1 <= len(args) <= 2):
+        print("usage: python run_cells.py <src.py> [<dst.md>]", file=sys.stderr)
         return 2
     out_path = Path(args[1]) if len(args) == 2 else None
     run(Path(args[0]), out_path)

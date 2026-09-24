@@ -18,7 +18,7 @@ Evidence: ls project_root | tool output (this turn) → matched signal "<signal>
 
 Example: `pixi.toml present → pixi`.
 
-### Gate rows (G-ENV-MGR, G-ENV-SCOPE, G-AGENT-FEATURE)
+### Gate rows (G-ENV-MGR, G-ENV-SCOPE)
 
 Evidence is one of:
 
@@ -27,7 +27,12 @@ Evidence is one of:
 - `Evidence: user quote turn N: "..."`: free-text from the user
   named one of the listed options.
 - `Evidence: JOURNAL.md Status (Workspace decisions, recorded YYYY-MM-DD)`
-  - the decision was made in a prior session.
+  - the decision was made in a prior session. Angle brackets left
+  in the value are not a recorded row.
+
+`G-AGENT-FEATURE` is not a question. Evidence is `import IPython`
+succeeding in the project env, or `agent feature: installed` already
+in the journal.
 
 ### Workflow rows
 

@@ -27,8 +27,10 @@ description: >
       `data-science-python-stack` Tier 1).
 
   SKIP when: the project is non-Python; the only edits in this turn
-  are to Markdown / TOML / JSON / YAML; the file lives in a
-  third-party vendored directory the user doesn't own.
+  are to Markdown / TOML / JSON / YAML; the only Python file touched
+  is `data/eda.py` from an explore turn (do not copy `ruff.toml`
+  for it); the file lives in a third-party vendored directory the
+  user doesn't own.
 
   HOW TO USE: run ruff manually on the files you just touched - do
   not configure a PostToolUse hook for this. **Read the "Stop
@@ -63,16 +65,16 @@ touched, no hook involved.
   This is the anti-infinite-loop guardrail - do not enter a third
   cycle on the same warning.
 - **Don't lint files outside the user's code.** The hook scope is
-  `src/<pkg>/`, `experiments/`, `audit/`, `data/eda.py` (the
-  explore-ml-data EDA script), top-level `*.py` scripts, and any
-  package directory the user owns. Skip vendored paths, generated
-  files, the rest of user-owned `data/`, and anything under `.pixi/`,
+  `src/<pkg>/`, `experiments/`, `audit/`, top-level `*.py` scripts, and any
+  package directory the user owns. Skip `data/eda.py` from an explore
+  turn, and do not copy `ruff.toml` for that file. Skip vendored paths,
+  generated files, the rest of user-owned `data/`, and anything under `.pixi/`,
   `.venv/`, `node_modules/`, etc.
 - **Never write `ruff.toml` from memory.** The bundled
   `templates/ruff.toml` is the single source of truth - it encodes
   the per-file ignores (`experiments/**`), the numpydoc convention,
   and the rule selection this stack expects. Initial setup requires
-  **`Read .agents/skills/python-code-style/templates/ruff.toml`**
+  **`Read .bob/skills/python-code-style/templates/ruff.toml`**
   *this turn*, then `Write <project-root>/ruff.toml` verbatim from
   that file's content. Authoring a custom `ruff.toml` from training-
   data memory drops half the contract silently. If you catch
@@ -108,7 +110,7 @@ Pre-flight (python-code-style):
       If absent AND stack + workspace are already set up: the
       bundled template MUST be read **this turn** before being
       written verbatim.
-      Evidence: Read .agents/skills/python-code-style/templates/ruff.toml
+      Evidence: Read .bob/skills/python-code-style/templates/ruff.toml
                 (this turn) + Write <project-root>/ruff.toml (this turn)
                 | "n/a - ruff.toml already at project root"
       **Inline-authored ruff.toml from memory is NOT evidence.**
@@ -284,7 +286,7 @@ scaffolded by their respective skills:
 
 1. **Read the bundled template** with the file-reading tool *this
    turn*:
-   `Read .agents/skills/python-code-style/templates/ruff.toml`.
+   `Read .bob/skills/python-code-style/templates/ruff.toml`.
    The pre-flight Evidence row for the `ruff.toml present` check
    requires this read; an inline-authored config from memory does
    not satisfy it.
@@ -294,9 +296,12 @@ scaffolded by their respective skills:
    `pydocstyle.convention = "numpy"` setting, and the rule
    selection this stack expects. Diverging from it drops half the
    contract.
-3. **Verify ruff picks it up**: `pixi run ruff check --show-settings
-   .` should report the `numpy` convention and the `select` list
-   from the template.
+3. **Verify once.** Run `ruff check --show-settings .` one time,
+   with the project's env prefix when one is recorded (`pixi run`,
+   `uv run`, or plain `ruff`). Exit 0 is enough. The numpy
+   convention is the `convention = "numpy"` line in the `ruff.toml`
+   just written. To see it, Read `ruff.toml` and stop. Do not run
+   the command again because the dump omitted that line.
 
 Do not fold ruff config into `pyproject.toml` automatically - the
 project may not have one, or the user may prefer a separate file.
@@ -308,6 +313,7 @@ The standalone `ruff.toml` is unambiguous.
 |---|---|
 | "I know what ruff.toml should contain" → author from memory | The bundled template carries `experiments/**` per-file ignores, the numpydoc convention, and a curated rule selection. Memory misses these and the contract silently breaks |
 | Read this skill's SKILL.md text describing the template → write from that | The SKILL.md describes; the template file *is*. Read the file itself, write it verbatim |
+| `ruff check --show-settings` did not show `convention = "numpy"` → run it again | The setting is not in that dump. One run, exit 0, then stop. The convention lives in `ruff.toml` |
 
 ## When ruff finds something Claude didn't write
 

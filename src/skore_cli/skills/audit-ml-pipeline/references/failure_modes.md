@@ -24,12 +24,11 @@ Never substitute by re-running `evaluate` + `put`. See `python-api`
 
 ## `run_cells.py` exits with `ModuleNotFoundError: No module named 'IPython'`
 
-Agent feature not installed in the env the runner is invoked from.
-**Delegate to `python-env-manager` § "Agent feature" via
-`G-AGENT-FEATURE`.** Do not type install commands from this skill.
-The per-manager install scripts under
-`.agents/skills/python-env-manager/scripts/install_agent_feature_<manager>.sh`
-do the full install + verification in one call.
+`IPython` is missing from the env the runner is invoked from.
+**Delegate to `python-env-manager` § "Agent feature".** It installs
+`ipython` into that env without asking. Do not type install
+commands from this skill, do not install `pyright`, and do not
+offer to skip the audit.
 
 ## Cell renders as `<Display object at 0x…>` in the digest
 

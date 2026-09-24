@@ -96,9 +96,20 @@ Then before answering:
    for the rest of the session (verbose, plain language).
 3. **Check `Workspace decisions` block** for pre-recorded gates
    (tabular, env_manager, package, skore_mode, cv_splitter, student
-   prior) - a recorded decision skips its `AskUserQuestion`.
-4. **Emit the Pre-flight checklist** with each box filled.
-5. **Use the Mode picker** to find which section to read.
+   prior). A row is recorded only when its value is a concrete
+   choice plus a date. Angle-bracket placeholders
+   (`<pandas | polars>`, `<pixi | uv | …>`, `<YYYY-MM-DD>`) are not
+   decisions. Do not re-ask a concrete `env manager` or
+   `tabular library`. `data/eda.py` importing pandas or polars is
+   the tabular decision: write the row and do not ask. A recorded
+   `student prior:` row is not re-asked.
+4. **Lab guide, when `docs/GUIDED.md` exists.** Read that file,
+   `docs/CONTEXT.md`, and `references/lab_guide.md` before proposing
+   a model or drafting a design note. The guide is the brief. Do
+   not copy its steps into the journal. If the file is absent, skip
+   this and keep the generic loop.
+5. **Emit the Pre-flight checklist** with each box filled.
+6. **Use the Mode picker** to find which section to read.
 
 ## Mode picker: read this before navigating the body
 
@@ -191,6 +202,10 @@ Pre-flight (iterate-ml-experiment):
       Evidence: JOURNAL.md Status (Workspace decisions) |
                 AskUserQuestion id=<id>, answer=<beginner|some-sklearn|comfortable>
                 this turn (see references/student_prior.md)
+- [ ] Lab guide: read | absent
+      Evidence: Read docs/GUIDED.md + docs/CONTEXT.md +
+                references/lab_guide.md (this turn)
+                | "n/a - docs/GUIDED.md absent"
 - [ ] Mode: bootstrap | iterate-propose | iterate-record |
       overview | compare | goal-pivot | abandoned | re-run
       Evidence: rule that matched (Mode picker row)
@@ -247,28 +262,40 @@ placeholder, or has 0 History rows.
    `journal/` → hand off to `organize-ml-workspace`, return when
    the placeholder `JOURNAL.md` exists.
 2. **Rewrite `JOURNAL.md` from `templates/JOURNAL.md`**.
-3. **Derive the goal default from `data/README.md`** *before*
-   asking. Propose one sentence; user confirms or amends.
+3. **Derive the goal.** If `docs/GUIDED.md` exists, the sentence
+   comes from `references/lab_guide.md` (true OFF score, RMSE,
+   patient holdout), after reading `docs/GUIDED.md` and
+   `docs/CONTEXT.md`. Otherwise derive it from `data/README.md`
+   *before* asking. Propose one sentence; the user confirms or
+   amends.
 4. **Explore the data BEFORE designing the model (G-EDA).** Dispatch
-   to `explore-ml-data`. The gate is binary (**run** / **skip**); on
-   run it executes `data/eda.py`, writes `data/eda.md` + HTML, and
-   fills the `## Data understanding (EDA)` JOURNAL section. The
-   findings (target balance / skew, datetime / group columns,
-   missingness, cardinality) feed the next step's learner and metric
-   defaults and inform the CV strategy chosen later at the evaluation
-   step. The run path needs the agent feature (`ipython`) and may
-   trigger `G-AGENT-FEATURE` here, before the baseline; if the user
-   declines it, EDA falls back to **skip**. On skip, the JOURNAL
-   section records `Status: skipped`.
-5. **Auto-draft `journal/01_baseline.md`** via the consultation
+   to `explore-ml-data`. The gate is one `AskUserQuestion` (id
+   `G-EDA`, **run** / **skip**, or **re-run** / **keep** when EDA
+   is already done) and that ask ends the turn. Do not place
+   `data/eda.py` in the ask turn. On the next turn, **run** executes
+   `data/eda.py`, writes `data/eda.md` + HTML, and fills the
+   `## Data understanding (EDA)` JOURNAL section. The findings
+   (target balance / skew, datetime / group columns, missingness,
+   cardinality) feed the next step's learner and metric defaults and
+   inform the CV strategy chosen later at the evaluation step. The
+   run path needs `IPython` in the env that already imports `skrub`.
+   If that import fails, `python-env-manager` installs `ipython`
+   there without a question. There is no skip-because-install-was-
+   declined path. On **skip**, the JOURNAL section records
+   `Status: skipped`. An explicit request to explore the data is
+   **run** and does not ask.
+5. **Auto-draft the first design note.** When `docs/GUIDED.md`
+   exists, the note is the unfinished section from
+   `references/lab_guide.md` (hub key included). `01_dummy` and
+   `02_ridge` use `splitter=0.2` and do not ask `G-CV-SPLITTER`.
+   Otherwise draft `journal/01_baseline.md` via the consultation
    chain, **informed by the EDA findings**: learner default
    (`build-ml-pipeline`) and metric default (`python-api` on
-   skore.evaluate). **Do NOT fix a splitter here**: the
-   cross-validation strategy is data-driven and decided at the
-   evaluation step (`G-CV-SPLITTER`, owned by `evaluate-ml-pipeline`)
-   once the pipeline's X-marker exists; the note simply records that it
-   is decided then. Conflicts with the EDA findings or the goal → flag
-   in **Risks**, don't override.
+   skore.evaluate). **Do NOT fix a splitter in that generic note**:
+   the cross-validation strategy is decided at the evaluation step
+   (`G-CV-SPLITTER`, owned by `evaluate-ml-pipeline`). Conflicts
+   with the EDA findings or the goal → flag in **Risks**, don't
+   override.
 6. **User's role in bootstrap is approve or amend**: not invent.
 7. **Exit bootstrap** once the baseline is approved and recorded.
    Audit file lands at first § 4 record-outcome.
@@ -286,10 +313,10 @@ placeholder, or has 0 History rows.
 | `G-ENV-MGR` | Env manager | `python-env-manager` | before any install command |
 | `G-TABULAR` | Tabular library (pandas / polars) | `data-science-python-stack` | before `data.py` write |
 | `G-SKORE-MODE` | Skore Project mode (local / hub / mlflow) + hub workspace name or MLflow tracking URI | `organize-ml-workspace` | before `pyproject.toml` write |
-| `G-EDA` | Explore the data (run / skip) before the baseline is designed | `explore-ml-data` | before the `journal/01_baseline.md` draft |
-| `G-AGENT-FEATURE` | Install ipython + pyright (install / skip) | `python-env-manager` | **conditional**: when G-EDA = run and the agent feature isn't present (else first audit at § 4) |
+| `G-EDA` | Explore the data (run / skip, or re-run / keep) before the baseline is designed | `explore-ml-data` | before the `journal/01_baseline.md` draft. The ask ends the turn; `data/eda.py` is written on the next turn |
+| `G-AGENT-FEATURE` | Install `ipython` into the project env | `python-env-manager` | **not a question**: when `import IPython` fails and G-EDA = run, or at the first audit. No Pyright, no second env, no skip |
 | `G-DESIGN` | User approval of `journal/01_baseline.md` | this skill | before any `src/<pkg>/` or `experiments/` code - i.e. before the § 3 chain |
-| `G-CV-SPLITTER` | CV family for `skore.evaluate` | `evaluate-ml-pipeline` | **inside the § 3 chain, AFTER G-DESIGN**: at the evaluate step, before `evaluate.py` write; mandatory even with empty `split_kwargs` |
+| `G-CV-SPLITTER` | CV family for `skore.evaluate` | `evaluate-ml-pipeline` | **inside the § 3 chain, AFTER G-DESIGN**: at the evaluate step, before `evaluate.py` write. When `docs/GUIDED.md` exists, closed for `01_dummy` and `02_ridge` (`splitter=0.2`); opens on the guide's grouped-CV section (`references/lab_guide.md`) |
 | `G-RUN` | "run now" vs "leave for later" | this skill | before executing the experiment script |
 
 Free-text "quick baseline" / "you pick" do NOT resolve any of

@@ -24,7 +24,7 @@ Evidence is the file-reading tool call this turn for the named
 SKILL.md.
 
 ```
-Evidence: Read .agents/skills/<name>/SKILL.md (this turn)
+Evidence: Read .bob/skills/<name>/SKILL.md (this turn)
 ```
 
 Citing the cross-reference *to* a sibling skill (e.g. "see

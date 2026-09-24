@@ -48,12 +48,11 @@ plus an orthogonal **agent feature**:
 3. **Optional**: install only when the project's task requires it.
 4. **Transitive**: already pulled in by the mandatory tier; do not
    install explicitly, but know they're available.
-5. **Agent feature (orthogonal)**: deps that the *agent* uses
-   to audit a workspace and to power the editor LSP integration
-   (`ipython`, `pyright`), kept out of the production-shape
-   runtime via a manager-specific scope. Install logistics owned
-   by `python-env-manager` § "Agent feature"; consumed by
-   `audit-ml-pipeline` and the opencode LSP integration.
+5. **Agent feature (orthogonal)**: `ipython` for the in-process
+   cell runner, installed into the same env as the project stack.
+   Not a question, and not `pyright`. Install logistics owned by
+   `python-env-manager` § "Agent feature"; consumed by
+   `explore-ml-data` and `audit-ml-pipeline`.
 
 ## Stop conditions: read before naming any library
 
@@ -116,7 +115,14 @@ Whenever the stack offers two or more libraries for the same job:
 2. **Persist the answer in `journal/JOURNAL.md` Status under
    `Workspace decisions`.** This block is immutable until the user
    explicitly pivots. On future sessions, **read Status first**;
-   do not re-ask a recorded decision. The persistence contract
+   do not re-ask a recorded decision. A value is recorded only when
+   it names a concrete choice and a date. Angle brackets left in
+   the value (`<pandas | polars>`, `<YYYY-MM-DD>`) mean the template
+   is still there. That is not a decision, and it is not a reason
+   to skip the ask. A concrete `tabular library: pandas` (or
+   `polars`) row is not re-asked. `data/eda.py` already importing
+   `pandas` or `polars` is the decision: write the row from that
+   import and do not ask. The persistence contract
    lives in `iterate-ml-experiment`'s `JOURNAL.md` template - the
    `Workspace decisions` block is the source of truth for cross-
    session continuity.
@@ -433,9 +439,10 @@ available without an extra install.
 
 ## Agent feature: orthogonal to the four tiers
 
-The audit flow owned by `audit-ml-pipeline` and the editor LSP
-integration both need agent-only tooling (`ipython` + `pyright`).
-These deps don't fit cleanly into the four tiers above:
+The cell runner used by `audit-ml-pipeline` and `explore-ml-data`
+needs `ipython` in the same env as the project stack. The import
+is `IPython`. `pyright` is not part of that install. These deps
+don't fit cleanly into the four tiers above:
 
 - They are **not Tier 1 mandatory**: workspaces that don't run
   audits and don't use opencode's LSP never need them.
@@ -454,28 +461,23 @@ the data-science deps.
 
 | Library | Role |
 |---|---|
-| `ipython` | Powers the shared cell runner `audit-ml-pipeline/scripts/run_cells.py` via `IPython.core.interactiveshell.InteractiveShell.run_cell`. Executes `# %%` cells in-process (audit files AND `explore-ml-data`'s `data/eda.py`), captures plain-text repr per cell. |
-| `pyright` | Powers the opencode LSP integration for Python files. Surfaces import / type / undefined-symbol diagnostics in the editor. Configured via the bundled `pyrightconfig.json` template (shipped by `python-env-manager`). |
+| `ipython` | Powers the shared cell runner `.bob/skills/audit-ml-pipeline/scripts/run_cells.py` via `IPython.core.interactiveshell.InteractiveShell.run_cell`. Executes `# %%` cells in-process (audit files AND `explore-ml-data`'s `data/eda.py`), captures plain-text repr per cell. |
 
-**Install + config drop: owned by `python-env-manager` § "Agent
-feature".** That skill carries the per-manager install table
-(pixi features / uv groups / poetry groups / hatch envs / conda
-envs / pip+venv extras) and the `pyrightconfig.json` placement
-step.
+**Install: owned by `python-env-manager` § "Agent feature".**
+That skill adds `ipython` to the project env. It does not ask,
+does not install `pyright`, and does not create a second env.
 
-**Consumed by `audit-ml-pipeline` and the LSP.** When either
-consumer fires and the agent feature isn't present, the calling
-skill routes through `python-env-manager`'s `G-AGENT-FEATURE`
-gate before proceeding.
+**Consumed by `audit-ml-pipeline` and `explore-ml-data`.** When
+`import IPython` fails, the calling skill routes through
+`python-env-manager`. That install is not a question.
 
 **No kernel registration.** The in-process runner doesn't need a
 Jupyter kernel.
 
 **Distinct from the `dev` feature's notebook tooling.** `jupyterlab`
 + `ipykernel` are ambient in `dev` for interactive notebook
-editing; `jupytext` stays Tier 3 opt-in. The agent feature
-(`ipython` + `pyright`) is its own bucket - `ipython` powers the
-in-process audit runner (no kernel), not user-facing notebook work.
+editing; `jupytext` stays Tier 3 opt-in. `ipython` powers the
+in-process cell runner (no kernel), not user-facing notebook work.
 A workspace may have any combination of the three concerns.
 
 ## Conventions

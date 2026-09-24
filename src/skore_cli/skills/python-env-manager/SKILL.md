@@ -20,9 +20,10 @@ description: >
       `organize-ml-workspace`, `audit-ml-pipeline`);
   (4) starting a new Python project and no manager is in place yet
       (bootstrap with pixi unless the user picks otherwise);
-  (5) `audit-ml-pipeline` (or another agent-only consumer) needs the
-      **agent feature** (`ipython` + `pyright`) and it isn't yet
-      present in the project's manifest - see § "Agent feature".
+  (5) `audit-ml-pipeline` or `explore-ml-data` needs `IPython` in
+      the project env and `import IPython` fails - install the
+      `ipython` package there, do not ask, do not install `pyright`,
+      and do not create a second env. See § "Agent feature".
 
   SKIP when: the project is non-Python; the install/add command is
   for a non-Python tool (npm, brew, apt, cargo, gem); the dependency
@@ -105,7 +106,7 @@ Pre-flight (python-env-manager):
 - [ ] Sibling SKILL.md files opened this turn:
       data-science-python-stack, iterate-ml-experiment,
       organize-ml-workspace
-      Evidence: Read .agents/skills/<each>/SKILL.md (this turn)
+      Evidence: Read .bob/skills/<each>/SKILL.md (this turn)
 - [ ] `journal/JOURNAL.md` Status `Workspace decisions` block read
       this turn for `env manager:` and `agent feature:` rows.
       Evidence: lists each row's value or "not recorded yet" |
@@ -123,19 +124,20 @@ Pre-flight (python-env-manager):
 - [ ] G-ENV-SCOPE resolved ONLY for ambiguous extras
       Evidence: AskUserQuestion id=<id> | user quote turn N |
                 "n/a - package routes automatically"
-- [ ] (Agent-feature installs only) G-AGENT-FEATURE resolved: install | skipped
-      Evidence: AskUserQuestion id=<id> | JOURNAL.md Status (recorded YYYY-MM-DD) |
-                "n/a - not an agent-feature install"
+- [ ] (IPython installs only) `import IPython` in the project env
+      Evidence: the install command's exit code, or
+                JOURNAL.md `agent feature: installed`
+                | "n/a - import IPython already succeeds"
+                | "n/a - not an IPython install"
+      This is not a question. Do not offer skip.
 - [ ] Install command syntax confirmed for that manager (see § "Install commands")
       Evidence: cite the matching subsection
 - [ ] Package list ready: <pkg-1, pkg-2, ...>
       Evidence: explicit list in this turn's response
-- [ ] (Agent-feature installs only) `pyrightconfig.json` drop step queued
-      Evidence: Read templates/pyrightconfig.json (this turn) + Write to project root
-                | "n/a - not an agent-feature install"
-                | "n/a - pyrightconfig.json already at project root"
-- [ ] (Agent-feature installs only) Verification commands queued
-      Evidence: commands quoted in this turn's response | "n/a"
+- [ ] (IPython installs only) no `pyright` install and no second env
+      Evidence: the command adds `ipython` to the env that already
+                imports the project stack
+                | "n/a - not an IPython install"
 - [ ] Pre-flight re-emitted with evidence before final message.
       Evidence: this same checklist appears in the end-of-turn summary.
 ```
@@ -204,64 +206,59 @@ One step: `pixi add <pkg>` (no `--feature` flag → lands in
 
 #### When a new named feature `<X>` is picked: 6 steps, all required
 
-**This is the load-bearing procedure smaller models forget.** Step
-3 specifically is the one that silently breaks LSP integration.
+This lab has no `lsp` env. Do not create one, and do not run
+`scripts/verify_layout.sh`.
 
 1. **Install into the new feature**: `pixi add --feature <X> <pkg>`
    (manager-equivalents: `uv add --group <X> <pkg>`,
    `poetry add --group <X> <pkg>`).
 2. **Confirm the feature block exists** in the manifest.
-3. **APPEND `<X>` to the `lsp` env's features list** -
-   per-manager:
-   - **pixi**: edit `pixi.toml` `[environments]`,
-     `lsp = { features = [..., "<X>"], ... }`.
-   - **uv / poetry**: nothing extra (`--all-groups` / `--with` covers).
-   - **hatch / conda / pip+venv**: re-author the lsp env's dep list.
-4. **Re-sync the lsp env**: pixi → `pixi install -e lsp`; uv →
-   `uv sync --all-groups`; poetry → `poetry install --with <X>`;
-   others → re-create.
-5. **Update `JOURNAL.md`**: append `<X>` to the
+3. **Re-sync the project env** so `<X>` is importable there.
+4. **Update `JOURNAL.md`**: append `<X>` to the
    `optional features:` row.
-6. **Verify**: `bash .agents/skills/python-env-manager/scripts/verify_layout.sh`.
-   Exit 0 = consistent. Exit 1 = drift, with remediation lines.
-
-Skipping step 3 or 4 → the package installs into `<X>` but pyright
-doesn't index it because `lsp` doesn't compose `<X>`. User sees
-"unresolved import" on legitimate code.
+5. **Verify** with `import <pkg>` in the project env.
 
 → next: return to caller skill.
 
-### `G-AGENT-FEATURE`: install ipython + pyright
+### `G-AGENT-FEATURE`: install ipython into the project env
 
-**Fires when**: an agent-only consumer (`audit-ml-pipeline` for audit
-files, or `explore-ml-data` for `data/eda.py`) needs `ipython` /
-`pyright` and the manifest doesn't expose them. With `explore-ml-data`
-this can fire as early as **bootstrap** (the G-EDA run path, before
-the baseline), not only at the first audit.
+**Not a question.** The cell runner and the audit need `IPython`
+in the same environment as the project stack. The import is
+`IPython`, not `ipython`. When that import fails, install the
+`ipython` package with the recorded manager into that env
+(`uv add ipython`, `pixi add ipython`, `poetry add ipython`,
+`conda install -n <env> -c conda-forge ipython`, or
+`pip install ipython` inside the project `.venv`). If
+`import <pkg>` then fails, editable-install the project into
+that same env. Do not `AskUserQuestion`. Do not offer skip.
 
-**AskUserQuestion (binary)**: `install` | `skip`.
-- `install` → run the bundled per-manager script (see § "Agent
-  feature install"). Recommended default for any workspace using the
-  audit or EDA flow.
-- `skip` → block the calling skill; surface "audit / EDA step
-  unavailable until the agent feature is installed". No silent
-  degradation. (`explore-ml-data` then falls back to its EDA-skip
-  path; `audit-ml-pipeline` blocks.)
+Do not install `pyright`. Do not create `.venv-agent` or any
+second environment. Do not run `scripts/install_agent_feature_*.sh`.
+Those scripts install Pyright, which is an editor concern, not a
+run concern.
 
-**Persists**: `agent feature: <installed | skipped> - recorded: <date>`.
+**Persists**: `agent feature: installed - recorded: <date>` when
+`import IPython` succeeds in the project env.
 
 There is no kernel registration. The audit runner is in-process.
 The `agent kernel:` row in `Workspace decisions` is no longer
 collected for new workspaces; legacy rows are informational.
 
-→ next: § "Agent feature install" if `install`.
+If `import IPython` and `import skrub` already succeed, do not
+install anything and do not bootstrap a manager.
+
+→ next: return to the caller (`explore-ml-data` or `audit-ml-pipeline`).
 
 ### Persistence lookup: read JOURNAL.md before any gate fires
 
-Read `Workspace decisions` first:
+Read `Workspace decisions` first. A row is recorded only when the
+value is a concrete choice and a date. Angle brackets left in the
+value (`<pixi | uv | …>`, `<pandas | polars>`, `<YYYY-MM-DD>`) mean
+it is still the template. That is not a decision, and it is not a
+reason to skip the ask.
 
-- `env manager: <pixi | uv | poetry | hatch | conda | pip+venv> - recorded: <date>`
-- `agent feature: <installed | skipped> - recorded: <date>`
+- `env manager: <concrete manager> - recorded: <date>`
+- `agent feature: installed - recorded: <date>`
 - `optional features: <name1, name2, ... | none> - recorded: <date>`
 
 If a row is recorded, **do not re-ask**: cite
@@ -273,24 +270,24 @@ before `organize-ml-workspace`), the gates fire fresh and answers
 land in `Workspace decisions` once `iterate-ml-experiment` writes
 the JOURNAL.
 
-## Where does the package belong?: 3-feature layout
+## Where does the package belong?
 
-### The fixed buckets
+The cell runner uses the same env as the project stack. Install
+`ipython` into `default`. Do not create an `agent` or `lsp` env
+and do not install `pyright`.
+
+### The buckets
 
 | Bucket | Contents | Composes with | Purpose |
 |---|---|---|---|
-| `default` | `scikit-learn`, `skrub`, `skore`, tabular lib, editable `<pkg>` | (itself) | runtime |
+| `default` | `scikit-learn`, `skrub`, `skore`, tabular lib, `ipython`, editable `<pkg>` | (itself) | runtime and the cell runner |
 | `dev` | `ruff`, `pytest`, `jupyterlab`, `ipykernel` | `default + dev` | lint / test / interactive notebooks |
-| `agent` | `ipython`, `pyright` | `default + agent` | audit runner + pyright CLI |
-| `lsp` | (no own deps) | `default + dev + agent + <all optional>` | LSP integration |
 
 Pixi composed-envs declaration:
 ```toml
 [environments]
 default = { features = ["default"], solve-group = "default" }
-dev     = { features = ["default", "dev"],          solve-group = "default" }
-agent   = { features = ["default", "agent"],        solve-group = "default" }
-lsp     = { features = ["default", "dev", "agent"], solve-group = "default" }
+dev     = { features = ["default", "dev"], solve-group = "default" }
 ```
 
 ### Auto-routing table: no ask
@@ -300,13 +297,12 @@ lsp     = { features = ["default", "dev", "agent"], solve-group = "default" }
 | `scikit-learn`, `skrub`, `skore` (or `skore[hub]`) | `default` |
 | `pandas` + `pyarrow` OR `polars` | `default` |
 | `ruff`, `pytest`, `jupyterlab`, `ipykernel` | `dev` |
-| `ipython`, `pyright` | `agent` |
+| `ipython` | `default` |
 | The editable workspace package (`<pkg> @ .`) | `default` |
 
 Ambiguous → `G-ENV-SCOPE` fires.
 
-Rationale (why `lsp` is separate, optional-feature growth model):
-→ `references/composition_model.md`.
+Do not route `ipython` to a separate feature.
 
 ## Install commands: by manager
 
@@ -387,34 +383,24 @@ Editable workspace install (`src/<pkg>/`) per manager:
 
 ## Agent feature install
 
-The agent feature = project-scoped install of `ipython` + `pyright`
-+ the bundled `pyrightconfig.json` (substituting `<PYTHON_PATH>`
-for the lsp env's interpreter).
+Install `ipython` into the environment that already runs the
+project. Do not ask. Do not install `pyright`. Do not create a
+second virtualenv. Do not run `scripts/install_agent_feature_*.sh`.
 
-### Bundled scripts: one per manager
+| Manager | Command |
+|---|---|
+| **pixi** | `pixi add ipython` |
+| **uv** | `uv add ipython` |
+| **poetry** | `poetry add ipython` |
+| **hatch** | add `ipython` to the env the project already runs, then sync |
+| **conda / mamba** | `conda install -n <env> -c conda-forge ipython` |
+| **pip+venv** | `pip install ipython` inside the project `.venv` |
 
-| Manager | Invocation | Args |
-|---|---|---|
-| **pixi** | `bash .agents/skills/python-env-manager/scripts/install_agent_feature_pixi.sh` | none |
-| **uv** | `bash .agents/skills/python-env-manager/scripts/install_agent_feature_uv.sh` | none |
-| **poetry** | `bash .agents/skills/python-env-manager/scripts/install_agent_feature_poetry.sh` | none |
-| **hatch** | `bash .agents/skills/python-env-manager/scripts/install_agent_feature_hatch.sh` | none (requires user-authored `[tool.hatch.envs.agent]` + `[tool.hatch.envs.lsp]`) |
-| **conda** | `bash .agents/skills/python-env-manager/scripts/install_agent_feature_conda.sh <project-name>` | project name |
-| **pip+venv** | `bash .agents/skills/python-env-manager/scripts/install_agent_feature_pip_venv.sh <requirements-file>` | requirements file |
+Verify with `import IPython` in that env. When it succeeds, record
+`agent feature: installed - recorded: <date>`. If the project
+package then fails to import, editable-install it into the same env.
 
-**Run the script, don't retype.** Each script encodes per-manager
-footguns (poetry's `virtualenvs.in-project`, hatch's no-composition,
-conda's machine-local paths). Re-typing by hand is the named
-forbidden shortcut.
-
-Per-script anatomy (the 4 actions inside, post-install runner
-invocation, cleanup, verification):
-→ `references/agent_feature_anatomy.md`.
-
-Per-manager footguns:
-→ `references/per_manager_footguns.md`.
-
-→ next: return to caller (typically `audit-ml-pipeline`).
+→ next: return to the caller (`explore-ml-data` or `audit-ml-pipeline`).
 
 ## Tier 1 install: skore variant per mode
 
@@ -461,25 +447,44 @@ Why the variant matters, mode-switching procedure, the `[jupyter]`
 extra rationale:
 → `references/skore_variant.md`.
 
-## skrub install: macOS post-install
+## Graphviz: detect, install if absent, then macOS cache
 
-When skrub is being installed (or has just been installed) **and**
-the platform is macOS, run `dot -c` in the project's env once the
-install lands. This rebuilds graphviz's plugin / format cache;
-skipping it leaves the first `.skb.draw_graph()` /
-`.skb.full_report()` call printing format warnings or erroring out
-on font lookup.
+Skrub's `.skb.draw_graph()` / `.skb.full_report()` shell out to the
+`dot` program. `pydot` and the PyPI package `graphviz` are Python
+wrappers; importing them does not mean `dot` exists. Install
+`dot` only when a plot or one of those calls needs it. Do not
+install Graphviz during env setup, and do not run
+`winget install Graphviz.Graphviz` because skrub was just added.
+Do not ask when a plot does need it.
 
-```bash
-# right after the skrub install command lands, on macOS only:
-[[ "$(uname)" == "Darwin" ]] && pixi run dot -c
-```
-
-Per manager, swap the env-run prefix: `pixi run` / `uv run` /
-`poetry run` / `hatch run` / `conda run -n <env>` / activated
-`venv` → bare `dot -c`. Linux + Windows: no-op, skip the call.
-One-shot - no need to re-run on subsequent sessions unless graphviz
-itself was reinstalled.
+1. **Detect.** `command -v dot`, and `<manager> run dot -V` with the
+   recorded env manager (`pixi run`, `uv run`, `poetry run`,
+   `hatch run`, `conda run -n <env>`, `mamba run`, or the activated
+   venv). Do not search install prefixes.
+2. **Install when both probes miss.**
+   - **pixi:** `pixi add graphviz`
+   - **conda / mamba:** `conda install -n <env> -c conda-forge graphviz`
+     or `mamba install -n <env> -c conda-forge graphviz`
+   - **uv / poetry / hatch / pip+venv:** do not install a PyPI
+     package for this. Those managers cannot ship the `dot` binary.
+     Run the first installer that `command -v` finds, in this order:
+     `brew install graphviz`,
+     `sudo -n apt-get install -y graphviz`,
+     `sudo -n dnf install -y graphviz`,
+     `sudo -n pacman -S --noconfirm graphviz`,
+     `winget install --id Graphviz.Graphviz -e --accept-package-agreements --accept-source-agreements`,
+     `choco install graphviz -y`.
+     `sudo -n` fails immediately when a password is required; do not
+     sit on a prompt. If the install exits non-zero, print that
+     command and continue. Do not try the next installer.
+3. **Probe again** the same way. Still missing → one sentence naming
+   the command that failed, then continue. Drawing the pipeline is
+   not a bootstrap blocker.
+4. **macOS only, and only once `dot` runs:** `dot -c` through the
+   invocation that just succeeded (`pixi run dot -c` when the binary
+   is in the pixi env, otherwise plain `dot -c`). This rebuilds
+   graphviz's plugin cache. Linux and Windows: skip `dot -c`. Do not
+   re-run on later sessions unless graphviz itself was reinstalled.
 
 ## Bootstrap: when no manager is detected
 
@@ -487,22 +492,20 @@ If detection found nothing AND the user picked `pixi` via G-ENV-MGR:
 
 1. Check `command -v pixi`; surface install URL if missing.
 2. `pixi init`.
-3. Edit `pixi.toml`: declare 3 features (`default` / `dev` /
-   `agent`) + 4 envs (`default` / `dev` / `agent` / `lsp`). `dev`
-   carries `ruff`, `pytest`, `jupyterlab`, `ipykernel`; `agent`
-   carries `ipython`, `pyright`.
+3. Edit `pixi.toml`: declare `default` and `dev`. `dev` carries
+   `ruff`, `pytest`, `jupyterlab`, `ipykernel`. Do not create an
+   `agent` or `lsp` env and do not add `pyright`.
 4. Add Tier 1 deps to `default` (per G-SKORE-MODE table above -
    pixi is conda-forge, so `pixi add skore`, `pixi add
    "skore[hub]"`, or `pixi add "skore[mlflow]" "mlflow>=3"`; **no
-   `[jupyter]` extra** on pixi).
+   `[jupyter]` extra** on pixi). Add `ipython` to that same env
+   when EDA or the audit will run.
 5. Add tabular lib (per G-TABULAR: `pandas pyarrow` or `polars`).
 6. Wire editable workspace package
    (`pixi add --pypi "<pkg> @ ."` then edit to
    `<pkg> = { path = ".", editable = true }`; then `pixi install`).
-7. Drop `pyrightconfig.json` via `sed`-substitution of
-   `<PYTHON_PATH>` for `.pixi/envs/lsp/bin/python`.
-8. Sync all 4 envs: `pixi install` then `pixi install -e dev` /
-   `-e agent` / `-e lsp`.
+7. Sync `default` and `dev`: `pixi install` then `pixi install -e dev`.
+   Do not drop `pyrightconfig.json`.
 
 Full step-by-step with exact pixi.toml block, manager-equivalent
 flows, pixi-version compatibility notes:
@@ -516,7 +519,7 @@ flows, pixi-version compatibility notes:
 |---|---|
 | `data-science-python-stack` | Owns *what* to install; this skill turns it into a command |
 | `organize-ml-workspace` | Scaffold hands off here for editable install; G-TABULAR / G-SKORE-MODE feed this skill's bootstrap |
-| `audit-ml-pipeline` / `explore-ml-data` | G-AGENT-FEATURE fires from there (audit files; `data/eda.py`) |
+| `audit-ml-pipeline` / `explore-ml-data` | Missing `IPython` is installed from here, without a question |
 | `build-ml-pipeline` / `evaluate-ml-pipeline` | Missing-dep Stop conditions redirect here |
 | `iterate-ml-experiment` | Owns the `Workspace decisions` block this skill reads / writes |
 

@@ -94,16 +94,23 @@ Sibling skills (just-in-time):
   `(key, id)` → `get(id)`. Never substitute by re-running
   `evaluate` + `put`.
 - **Tabular library is asked, not assumed (G-TABULAR).** Pandas
-  being importable via skore is not a pick. Invoke
-  `data-science-python-stack` for the structured ask. Free-text
-  ("quick", "you pick") does NOT resolve. Persisted in JOURNAL.md
-  Status `Workspace decisions`.
+  being importable via skore is not a pick. A concrete
+  `tabular library` row in `Workspace decisions` is not re-asked.
+  An angle-bracket placeholder is not that row. `data/eda.py`
+  importing pandas or polars is the decision: write the row and
+  do not ask. Otherwise invoke `data-science-python-stack` for the
+  structured ask. Free-text ("quick", "you pick") does NOT resolve.
+  Persisted in JOURNAL.md Status `Workspace decisions`.
 - **Package name is asked, not inferred (G-PKG-NAME).** Before any
   `pyproject.toml` / manifest creation (including `pixi init` /
   `uv init` / `poetry init`), fire an `AskUserQuestion` for the
   `src/<pkg>/` import name. Folder name in snake_case is the
-  default. **Manifest creation before G-PKG-NAME passes is
-  forbidden**: running `init` first creates a `[project] name`
+  default. Do not treat `uv init`, `uv init --lib`, or `poetry init`
+  as the package layout. Those write a sample `def hello()` and no
+  `PROJECT_ROOT`. Copy `templates/src___init__.py` instead. If one
+  of those inits already ran, delete `hello` and replace
+  `__init__.py` with that template. **Manifest creation before
+  G-PKG-NAME passes is forbidden**: running `init` first creates a `[project] name`
   entry, and reading "name is in the manifest" back is circular.
   If a manifest exists, confirm via `AskUserQuestion` -
   continuity from a prior session is not continuity from a user

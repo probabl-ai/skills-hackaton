@@ -31,13 +31,10 @@ summary) come from `report.json()`, **not** from dataframe methods.
 The only library-specific line in the whole file is
 `RAW = <LOAD_RAW_DATA>`.
 
-> **Dependency:** `TableReport.json()`'s exact keys are not formally
-> documented and can shift across skrub versions. Confirm the shape
-> via `python-api` *this turn* (probe `report.json()` on a tiny frame
-> in `scratch/`), pin a skrub floor, and parse defensively with
-> `.get(...)`. If a key you expect is absent, adapt the field name -
-> don't crash the cell. (The template uses `name`, `dtype`,
-> `null_proportion`, `nunique`, `n_rows`, `columns`: verify these.)
+> The template's `TableReport.json()` keys are `name`, `dtype`,
+> `null_proportion`, `n_unique`, `n_rows`, and `columns`. Run
+> `data/eda.py` first. Write a scratch probe only if the digest shows
+> those fields as null. Do not probe before the first run.
 
 ## The `TableReport` repr trap (the load-bearing rule)
 
@@ -84,18 +81,21 @@ section. Put the value you want to read on the **last** line.
 
 ```python
 import json
+from pathlib import Path
 
 import skrub
 
-from <pkg> import PROJECT_ROOT
+# This file lives in data/, so parents[1] is the repo root.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 EDA_DIR = PROJECT_ROOT / "data"
 EDA_DIR.mkdir(parents=True, exist_ok=True)
 ```
 
-`from <pkg> import PROJECT_ROOT` works because the workspace package
-is installed editable by the time bootstrap reaches EDA. No
-pandas/polars import here - only the load cell needs the tabular lib.
+The runner sets `__file__` to `data/eda.py`, so this locates the repo
+before `src/<pkg>/` exists. A missing package import is not a reason
+to scaffold. No pandas/polars import here - only the load cell needs
+the tabular lib.
 
 ### Cell 3: load raw data (anywhere)
 
@@ -122,7 +122,7 @@ overview = [
         "column": c.get("name"),
         "dtype": c.get("dtype"),
         "null_pct": c.get("null_proportion"),
-        "n_unique": c.get("nunique"),
+        "n_unique": c.get("n_unique"),
     }
     for c in summary.get("columns", [])
 ]
@@ -161,7 +161,7 @@ datetime_cols = [
 ]
 unique_ratio = sorted(
     ({"column": c.get("name"),
-      "unique_ratio": (c.get("nunique") or 0) / n_rows if n_rows else None}
+      "unique_ratio": (c.get("n_unique") or 0) / n_rows if n_rows else None}
      for c in summary.get("columns", [])),
     key=lambda r: (r["unique_ratio"] is not None, r["unique_ratio"]),
     reverse=True,
@@ -180,7 +180,15 @@ unique_ratio = sorted(
 ### Cell 7: associations → downstream: leakage check
 
 ```python
-skrub.column_associations(RAW).head(20)
+assoc = skrub.column_associations(RAW)
+# Same library as RAW: pandas has to_dict, polars has to_dicts.
+rows = assoc.to_dicts() if hasattr(assoc, "to_dicts") else assoc.to_dict(orient="records")
+target_links = [
+    row
+    for row in rows
+    if row["left_column_name"] == TARGET or row["right_column_name"] == TARGET
+]
+{"with_target": target_links[:15], "strongest": rows[:10]}
 ```
 
 - A feature with an **implausibly perfect** association to the target
